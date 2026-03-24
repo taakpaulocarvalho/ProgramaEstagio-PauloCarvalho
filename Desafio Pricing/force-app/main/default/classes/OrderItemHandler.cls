@@ -17,7 +17,7 @@ public with sharing class OrderItemHandler extends TriggerHandler{
         for(OrderItem item : novosItens){
 
             if (item.OrderId != null) idsPedidos.add(item.OrderId);
-            if (item.Produto__c != null) idsProdutos.add(item.Produto__c);
+            if (item.Product2Id != null) idsProdutos.add(item.Product2Id);
         }
 
         //BUSCAR OS DADOS DO PEDIDO
@@ -60,7 +60,7 @@ public with sharing class OrderItemHandler extends TriggerHandler{
             Id idEstado = (pedido != null && pedido.Endereco__r != null && pedido.Endereco__r.Cidade__r != null) ? pedido.Endereco__r.Cidade__r.Estado__c : null;
 
             //CHAVE PARA O ITEM ATUAL
-            String chaveBusca = '' + item.Produto__c + pedido.Centro_Distribuicao__c + idEstado;
+            String chaveBusca = '' + item.Product2Id + pedido.Centro_Distribuicao__c + idEstado;
             
             //VERIFICA SE EXISTE IMPPOSTO PARA O ITEM ATUAL
             if (mapaImpostoSobreCusto.containsKey(chaveBusca)){

@@ -58,7 +58,7 @@ public with sharing class ImpostoHandler extends TriggerHandler{
     }
 
     private String gerarChave(Imposto__c imposto){
-        return '' + imposto.Produto__c + imposto.Centro_Distribuicao__c + imposto.Estado__c;
+        return '' + String.valueOf(imposto.Produto__c) + String.valueOf(imposto.Centro_Distribuicao__c) + String.valueOf(imposto.Estado__c);
     }
 
 }
