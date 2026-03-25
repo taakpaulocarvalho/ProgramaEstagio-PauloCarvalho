@@ -2,10 +2,14 @@ public with sharing class OrderItemHandler extends TriggerHandler{
 
     public override void beforeInsert(){
         aplicaImposto((List<OrderItem>) Trigger.new);
+        aplicaFrete((List<OrderItem>) Trigger.new);
+        aplicaMargem((List<OrderItem>) Trigger.new);
     }
 
     public override void beforeUpdate(){
         aplicaImposto((List<OrderItem>) Trigger.new);
+        aplicaFrete((List<OrderItem>) Trigger.new);
+        aplicaMargem((List<OrderItem>) Trigger.new);
     }
 
     private void aplicaImposto(List<OrderItem>  novosItens){
@@ -40,7 +44,8 @@ public with sharing class OrderItemHandler extends TriggerHandler{
                                             WHERE Status__c = 'Aprovado'
                                             AND Produto__c IN :idsProdutos
                                             AND Centro_Distribuicao__c IN :idsCentrosDistribuicao
-                                            AND Estado__c IN :idsEstados];
+                                            AND Estado__c IN :idsEstados
+                                            ORDER BY CreatedDate DESC];
 
 
         System.debug('QUANTOS IMPOSTOS O SOQL ACHOU? ' + impostosNoBanco.size() );
@@ -48,7 +53,7 @@ public with sharing class OrderItemHandler extends TriggerHandler{
        //MAPEIA IMPOSTOS ENCONTRADOS 
         Map<String, Decimal> mapaImpostoSobreCusto = new Map<String, Decimal>();
         for (Imposto__c imposto : impostosNoBanco){
-            String chave = '' + imposto.Produto__c + imposto.Centro_Distribuicao__c + imposto.Estado__c;
+            String chave = '' + String.valueOf(imposto.Produto__c) + imposto.Centro_Distribuicao__c + imposto.Estado__c;
             mapaImpostoSobreCusto.put(chave, imposto.Imposto_Sobre_Custo__c);
         }
 
@@ -69,6 +74,228 @@ public with sharing class OrderItemHandler extends TriggerHandler{
             }
             else{
                 item.addError('Não está autorizada a venda deste produto devido a falta de parâmetros de Imposto. Entre em contato com o time de pricing.');
+            }
+        }
+    }
+
+    private void aplicaFrete(List<OrderItem>  novosItens){
+
+        Set<Id> idsPedidos = new Set<Id>();
+        Set<Id> idsProdutos = new Set<Id>();
+
+        for (OrderItem item : novosItens){
+            if (item.OrderId != null) idsPedidos.add(item.OrderId);
+            if (item.Product2Id != null) idsProdutos.add(item.Product2Id);
+        }
+
+        //BUSCAR OS DADOS DO PEDIDO
+        Map<Id, Order> pedidosMapa = new Map<id, Order>([
+                SELECT Id, Centro_Distribuicao__c, Endereco__r.Cidade__c,
+                                                   Endereco__r.Cidade__r.Estado__c,
+                                                   Endereco__r.Cidade__r.Estado__r.Pais__c
+                FROM Order
+                WHERE Id IN :idsPedidos
+        ]);
+
+        //BUSCAR DADO DO PRODUTO
+        Map<Id, Product2> produtosMapa = new Map<Id, Product2>([
+                SELECT Id, Hierarquia_Produto__c
+                FROM Product2
+                WHERE Id IN :idsProdutos
+        ]);
+
+
+        Set<Id> idsCidade = new Set<Id>();
+        Set<Id> idsEstados = new Set<Id>();
+        Set<Id> idsPaises = new Set<Id>();
+        Set<Id> idsHierarquias = new Set<Id>();
+        Set<Id> idsCentroDistribuicao = new Set<Id>();
+
+        for (Product2 produto : produtosMapa.values()){
+            if (produto.Hierarquia_Produto__c != null) idsHierarquias.add(produto.Hierarquia_Produto__c);
+        }
+
+        for (Order pedido : pedidosMapa.values()){
+            if (pedido.Endereco__r != null && pedido.Endereco__r.Cidade__c != null){
+                idsCidade.add(pedido.Endereco__r.Cidade__c);
+                
+                if (pedido.Endereco__r.Cidade__r.Estado__c != null){
+                    idsPaises.add(pedido.Endereco__r.Cidade__r.Estado__r.Pais__c);
+                }
+            }    
+            if (pedido.Centro_Distribuicao__c != null) idsCentroDistribuicao.add(pedido.Centro_Distribuicao__c);
+        }
+
+
+        //BUSCAR FRETES PRESENTES NO BANCO
+        List<Frete__c> fretesNoBanco = [SELECT Id, Produto__c, Hierarquia_Produto__c, Centro_Distribuicao__c, Cidade__c, Estado__c, Pais__c, Valor__c 
+                                            FROM Frete__c
+                                            WHERE Status__c = 'Aprovado'
+                                            AND (Centro_Distribuicao__c IN :idsCentroDistribuicao)
+                                            AND (Produto__c IN :idsProdutos OR Hierarquia_Produto__c IN :idsHierarquias)   
+                                            AND (Cidade__c IN :idsCidade OR Estado__c IN :idsEstados OR Pais__c IN :idsPaises)
+                                            ORDER BY CreatedDate DESC];
+
+
+        //LOGICA DE ESPECIFIDADE
+
+        for (OrderItem item : novosItens){
+
+            Decimal valorFreteSelecionado = null;
+            Integer maiorEspecifidade = -1;
+
+            if (item.OrderId != null && item.Product2Id != null){
+                Order pedido = pedidosMapa.get(item.OrderId);
+                Product2 produto = produtosMapa.get(item.Product2Id);
+
+                //LOOP PARA PERCORRER TODOS OS FRETES NO BANCO E SELECIONAR O MAIS ESPECIFICO
+                for (Frete__c frete : fretesNoBanco){
+
+                    //VERIFICA SE O FRETE ATENDE AO PEDIDO
+                    Boolean atendeCD = (frete.Centro_Distribuicao__c == pedido.Centro_Distribuicao__c);
+                    Boolean atendeProduto = (frete.Produto__c == produto.Id);
+                    Boolean atendeHierarquia = (frete.Hierarquia_Produto__c == produto.Hierarquia_Produto__c);
+                    Boolean atendeCidade = (frete.Cidade__c == pedido.Endereco__r.Cidade__c);
+                    Boolean atendeEstado = (frete.Estado__c == pedido.Endereco__r.Cidade__r.Estado__c);
+                    Boolean atendePais = (frete.Pais__c == pedido.Endereco__r.Cidade__r.Estado__r.Pais__c);
+
+                    //SE ATENDE OS PARAMETROS ESPECIFICOS DO PEDIDO APLICA A LOGICA DE ESPECIFIDADE
+                    if (atendeCD && (atendeProduto || atendeHierarquia) && (atendeCidade || atendeEstado || atendePais)){
+                        
+                        //FAZ UM SOMATORIO PARA VERIFICAR A ESPECIFIDADE DO FRETE DE ACORDO COM OS PARAMETROS
+                        Integer especifidade = 0;
+                        if (atendeProduto) especifidade += 2000;
+                        else if (atendeHierarquia) especifidade += 1000;
+
+                        if (atendeCidade) especifidade += 30;
+                        else if (atendeEstado) especifidade += 20;
+                        else if (atendePais) especifidade += 10;
+                        
+                        if (especifidade > maiorEspecifidade){
+                            maiorEspecifidade = especifidade;
+                            valorFreteSelecionado = frete.Valor__c;
+                        }
+                    }
+                }
+            }
+
+            //ATRIBUI O FRETE SELECIONADO AO CAMPO VALOR DE FRETE EM PRODUTO DO PEDIDO
+            if (valorFreteSelecionado != null){
+                item.Valor_Frete__c = valorFreteSelecionado;
+            }
+            else{
+                item.addError('Não está autorizada a venda deste produto devido a falta de parâmetros de frete. Entre em contato com o time de pricing.');
+            }
+        }
+    }
+
+    private void aplicaMargem(List<OrderItem> novosItens){
+
+        Set<Id> idsPedidos = new Set<Id>();
+        Set<Id> idsProdutos = new Set<Id>();
+
+        for (OrderItem item : novosItens){
+            if (item.OrderId != null) idsPedidos.add(item.OrderId);
+            if (item.Product2Id != null) idsProdutos.add(item.Product2Id);
+        }
+
+        //BUSCAR OS DADOS DO PEDIDO
+        Map<Id, Order> pedidosMapa = new Map<Id, Order>([SELECT Id, Account.Grupo_Clientes__c, Centro_Distribuicao__c,
+                                                             Endereco__r.Cidade__c, Endereco__r.Cidade__r.Estado__c, Endereco__r.Cidade__r.Estado__r.Pais__c
+                                                         FROM Order
+                                                         WHERE Id IN :idsPedidos]);
+
+        //BUSCAR OS DADOS DO PRODUTO
+        Map<Id, Product2> produtosMapa = new Map<Id, Product2>([SELECT Id, Hierarquia_Produto__c
+                                                                FROM Product2
+                                                                WHERE Id IN :idsProdutos]);
+
+        Set<Id> idsHierarquias = new Set<Id>();
+        Set<Id> idsContas = new Set<Id>();
+        Set<Id> idsGruposConta = new Set<Id>();
+        Set<Id> idsCentrosDistribuicao = new Set<Id>();
+        Set<Id> idsCidades = new Set<Id>();
+        Set<Id> idsEstados = new Set<Id>();
+        Set<Id> idsPaises = new Set<Id>();
+
+        for (Product2 produto : produtosMapa.values()){
+            
+            if (produto.Hierarquia_Produto__c != null) idsHierarquias.add(produto.Hierarquia_Produto__c);   
+        }
+
+        for (Order pedido : pedidosMapa.values()){
+            
+            if (pedido.AccountId != null) idsContas.add(pedido.AccountId);
+            if (pedido.Account.Grupo_Clientes__c != null) idsGruposConta.add(pedido.Account.Grupo_Clientes__c);
+            if (pedido.Centro_Distribuicao__c != null) idsCentrosDistribuicao.add(pedido.Centro_Distribuicao__c);
+
+            if (pedido.Endereco__r != null){
+                if (pedido.endereco__r.Cidade__c != null) idsCidades.add(pedido.endereco__r.Cidade__c);
+                if (pedido.endereco__r.Cidade__r.Estado__c != null) idsEstados.add(pedido.endereco__r.Cidade__r.Estado__c);
+                if (pedido.endereco__r.Cidade__r.Estado__r.Pais__c != null) idsPaises.add(pedido.endereco__r.Cidade__c);
+            }
+        }
+
+        //BUSCAR MARGENS PRESENTES NO BANCO
+        List<Margem__c> margensNoBanco = [SELECT Id, Produto__c, Hierarquia_Produto__c, Centro_Distribuicao__c, Conta__c, Grupo_Conta__c, Cidade__c, Estado__c, Pais__c, Valor__c
+                                                 FROM Margem__c
+                                                 WHERE Status__c = 'Aprovado'
+                                                 AND (Centro_Distribuicao__c IN :idsCentrosDistribuicao)
+                                                 AND (Produto__c IN :idsProdutos OR Hierarquia_Produto__c IN :idsHierarquias)
+                                                 AND (Conta__c IN :idsContas OR Grupo_Conta__c IN :idsGruposConta)
+                                                 AND (Cidade__c IN :idsCidades OR Estado__c IN :idsEstados OR Pais__c IN :idsPaises)
+                                                 ORDER BY CreatedDate DESC];
+
+
+        //LOGICA DE ESPECIFIDADE
+        for (OrderItem item : novosItens){
+            Order pedido = pedidosMapa.get(item.OrderId);
+            Product2 produto = produtosMapa.get(item.Product2Id);
+            
+            Decimal valorMargemSelecionado = null;
+            Integer maiorEspecifidade = -1;
+
+            for (Margem__c margem : margensNoBanco){
+
+                //VERIFICA SE A MARGEM ATENDE AO PEDIDO
+                Boolean atendeCD = (margem.Centro_Distribuicao__c == pedido.Centro_Distribuicao__c);
+                Boolean atendeProduto = (margem.Produto__c == item.Product2Id);
+                Boolean atendeHierarquia = (margem.Hierarquia_Produto__c == produto.Hierarquia_Produto__c);
+                Boolean atendeCidade = (margem.Cidade__c == pedido.Endereco__r.Cidade__c);
+                Boolean atendeEstado = (margem.Estado__c == pedido.Endereco__r.Cidade__r.Estado__c);
+                Boolean atendePais = (margem.Pais__c == pedido.Endereco__r.Cidade__r.Estado__r.Pais__c);
+                Boolean atendeConta = (margem.Conta__c == pedido.AccountId);
+                Boolean atendeGrupoConta = (margem.Grupo_Conta__c == pedido.Account.Grupo_Clientes__c);
+
+                //SE ATENDE OS PARAMETROS ESPECIFICOS DO PEDIDO APLICA A LOGICA DE ESPECIFIDADE
+                if (atendeCD && (atendeProduto || atendeHierarquia) && (atendeConta || atendeGrupoConta) && (atendeCidade || atendeEstado || atendePais )){
+                    
+                    Integer especifidade = 0;
+
+                    //FAZ UM SOMATORIO PARA VERIFICAR A ESPECIFIDADE DA MARGEM DE ACORDO COM OS PARAMETROS
+                    if (atendeProduto) especifidade += 2000;
+                    else if (atendeHierarquia) especifidade += 1000;
+
+                    if (atendeConta) especifidade += 200;
+                    else if (atendeGrupoConta) especifidade += 100;
+
+                    if (atendeCidade) especifidade += 30;
+                    else if (atendeEstado) especifidade += 20;
+                    else if (atendePais) especifidade += 10;
+                    
+                    if (especifidade > maiorEspecifidade){
+                        maiorEspecifidade = especifidade;
+                        valorMargemSelecionado = margem.Valor__c;
+                    }
+                }
+            }
+
+            //ATRIBUI A MARGEM SELECIONADA AO CAMPO PORCENTAGEM DE MARGEM EM PRODUTO DO PEDIDO
+            if (valorMargemSelecionado != null){
+                item.Porcentagem_Margem__c = valorMargemSelecionado;
+            }
+            else{
+                item.addError('Não está autorizada a venda deste produto devido a falta de parâmetros de margem. Entre em contato com o time de pricing.');
             }
         }
     }
