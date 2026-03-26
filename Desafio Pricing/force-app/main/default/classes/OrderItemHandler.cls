@@ -4,12 +4,14 @@ public with sharing class OrderItemHandler extends TriggerHandler{
         aplicaImposto((List<OrderItem>) Trigger.new);
         aplicaFrete((List<OrderItem>) Trigger.new);
         aplicaMargem((List<OrderItem>) Trigger.new);
+        validaParametrosObrigatorios((List<OrderItem>) Trigger.new);
     }
 
     public override void beforeUpdate(){
         aplicaImposto((List<OrderItem>) Trigger.new);
         aplicaFrete((List<OrderItem>) Trigger.new);
         aplicaMargem((List<OrderItem>) Trigger.new);
+        validaParametrosObrigatorios((List<OrderItem>) Trigger.new);
     }
 
     private void aplicaImposto(List<OrderItem>  novosItens){
@@ -71,9 +73,6 @@ public with sharing class OrderItemHandler extends TriggerHandler{
             if (mapaImpostoSobreCusto.containsKey(chaveBusca)){
                 item.Porcentagem_Imposto__c = mapaImpostoSobreCusto.get(chaveBusca);
                 System.debug('IMPOSTO APLICADO');
-            }
-            else{
-                item.addError('Não está autorizada a venda deste produto devido a falta de parâmetros de Imposto. Entre em contato com o time de pricing.');
             }
         }
     }
@@ -152,12 +151,12 @@ public with sharing class OrderItemHandler extends TriggerHandler{
                 for (Frete__c frete : fretesNoBanco){
 
                     //VERIFICA SE O FRETE ATENDE AO PEDIDO
-                    Boolean atendeCD = (frete.Centro_Distribuicao__c == pedido.Centro_Distribuicao__c);
-                    Boolean atendeProduto = (frete.Produto__c == produto.Id);
-                    Boolean atendeHierarquia = (frete.Hierarquia_Produto__c == produto.Hierarquia_Produto__c);
-                    Boolean atendeCidade = (frete.Cidade__c == pedido.Endereco__r.Cidade__c);
-                    Boolean atendeEstado = (frete.Estado__c == pedido.Endereco__r.Cidade__r.Estado__c);
-                    Boolean atendePais = (frete.Pais__c == pedido.Endereco__r.Cidade__r.Estado__r.Pais__c);
+                    Boolean atendeCD = (frete.Centro_Distribuicao__c != null && frete.Centro_Distribuicao__c == pedido.Centro_Distribuicao__c);
+                    Boolean atendeProduto = (frete.Produto__c != null && frete.Produto__c == produto.Id);
+                    Boolean atendeHierarquia = (frete.Hierarquia_Produto__c != null && frete.Hierarquia_Produto__c == produto.Hierarquia_Produto__c);
+                    Boolean atendeCidade = (frete.Cidade__c != null && frete.Cidade__c == pedido.Endereco__r.Cidade__c);
+                    Boolean atendeEstado = (frete.Estado__c != null && frete.Estado__c == pedido.Endereco__r.Cidade__r.Estado__c);
+                    Boolean atendePais = (frete.Pais__c != null && frete.Pais__c == pedido.Endereco__r.Cidade__r.Estado__r.Pais__c);
 
                     //SE ATENDE OS PARAMETROS ESPECIFICOS DO PEDIDO APLICA A LOGICA DE ESPECIFIDADE
                     if (atendeCD && (atendeProduto || atendeHierarquia) && (atendeCidade || atendeEstado || atendePais)){
@@ -182,9 +181,6 @@ public with sharing class OrderItemHandler extends TriggerHandler{
             //ATRIBUI O FRETE SELECIONADO AO CAMPO VALOR DE FRETE EM PRODUTO DO PEDIDO
             if (valorFreteSelecionado != null){
                 item.Valor_Frete__c = valorFreteSelecionado;
-            }
-            else{
-                item.addError('Não está autorizada a venda deste produto devido a falta de parâmetros de frete. Entre em contato com o time de pricing.');
             }
         }
     }
@@ -259,13 +255,13 @@ public with sharing class OrderItemHandler extends TriggerHandler{
 
                 //VERIFICA SE A MARGEM ATENDE AO PEDIDO
                 Boolean atendeCD = (margem.Centro_Distribuicao__c == pedido.Centro_Distribuicao__c);
-                Boolean atendeProduto = (margem.Produto__c == item.Product2Id);
-                Boolean atendeHierarquia = (margem.Hierarquia_Produto__c == produto.Hierarquia_Produto__c);
-                Boolean atendeCidade = (margem.Cidade__c == pedido.Endereco__r.Cidade__c);
-                Boolean atendeEstado = (margem.Estado__c == pedido.Endereco__r.Cidade__r.Estado__c);
-                Boolean atendePais = (margem.Pais__c == pedido.Endereco__r.Cidade__r.Estado__r.Pais__c);
-                Boolean atendeConta = (margem.Conta__c == pedido.AccountId);
-                Boolean atendeGrupoConta = (margem.Grupo_Conta__c == pedido.Account.Grupo_Clientes__c);
+                Boolean atendeProduto = (margem.Produto__c != null && margem.Produto__c == item.Product2Id);
+                Boolean atendeHierarquia = (margem.Hierarquia_Produto__c != null && margem.Hierarquia_Produto__c == produto.Hierarquia_Produto__c);
+                Boolean atendeCidade = (margem.Cidade__c != null && margem.Cidade__c == pedido.Endereco__r.Cidade__c);
+                Boolean atendeEstado = (margem.Estado__c != null && margem.Estado__c == pedido.Endereco__r.Cidade__r.Estado__c);
+                Boolean atendePais = (margem.Pais__c != null && margem.Pais__c == pedido.Endereco__r.Cidade__r.Estado__r.Pais__c);
+                Boolean atendeConta = (margem.Conta__c != null && margem.Conta__c == pedido.AccountId);
+                Boolean atendeGrupoConta = (margem.Grupo_Conta__c != null && margem.Grupo_Conta__c == pedido.Account.Grupo_Clientes__c);
 
                 //SE ATENDE OS PARAMETROS ESPECIFICOS DO PEDIDO APLICA A LOGICA DE ESPECIFIDADE
                 if (atendeCD && (atendeProduto || atendeHierarquia) && (atendeConta || atendeGrupoConta) && (atendeCidade || atendeEstado || atendePais )){
@@ -294,8 +290,41 @@ public with sharing class OrderItemHandler extends TriggerHandler{
             if (valorMargemSelecionado != null){
                 item.Porcentagem_Margem__c = valorMargemSelecionado;
             }
+        }
+    }
+
+    private void validaParametrosObrigatorios(List<OrderItem> novosItens){
+
+        Set<Id> idsProdutos = new Set<Id>();
+        for (OrderItem item : novosItens){
+            if (item.Product2Id != null) idsProdutos.add(item.Product2Id);
+        }
+
+        //BUSCA O CUSTO DE PRODUCAO DE CADA PRODUTO
+        Map<Id, Product2> mapaProdutos = new Map<Id, Product2>([
+            SELECT Id, Custo_Producao__c 
+            FROM Product2
+            WHERE Id IN :idsProdutos
+        ]);
+
+        for (OrderItem item : novosItens){
+
+            Product2 produto = mapaProdutos.get(item.Product2Id);
+
+            //VERIFICA SE EXISTE CUSTO DE PRODUCAO NO CADASTRO DO PRODUTO
+            Boolean temCusto = (produto != null && produto.Custo_Producao__c != null);
+
+            //VERIFICA SE O PRODUTO TEM TODOS OS PARAMETROS OBRIGATORIOS
+            Boolean temImposto = (item.Porcentagem_Imposto__c != null);
+            Boolean temFrete = (item.Valor_Frete__c != null);
+            Boolean temMargem = (item.Porcentagem_Margem__c != null);
+
+            //SE EXISTE ALGUM PARAMETRO FALTANDO, ADICIONA ERRO AO PRODUTO DO PEDIDO
+            if (!temCusto || !temImposto || !temFrete || !temMargem){
+                item.addError('Não está autorizada a venda deste produto devido a falta de parâmetros, entre em contato com o time de pricing.');
+            }
             else{
-                item.addError('Não está autorizada a venda deste produto devido a falta de parâmetros de margem. Entre em contato com o time de pricing.');
+                item.Custo_Producao__c = produto.Custo_Producao__c;
             }
         }
     }
