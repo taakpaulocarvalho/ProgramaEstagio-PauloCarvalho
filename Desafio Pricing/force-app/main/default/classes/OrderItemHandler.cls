@@ -5,6 +5,7 @@ public with sharing class OrderItemHandler extends TriggerHandler{
         aplicaFrete((List<OrderItem>) Trigger.new);
         aplicaMargem((List<OrderItem>) Trigger.new);
         validaParametrosObrigatorios((List<OrderItem>) Trigger.new);
+        calculaPreco((List<OrderItem>) Trigger.new);
     }
 
     public override void beforeUpdate(){
@@ -12,6 +13,7 @@ public with sharing class OrderItemHandler extends TriggerHandler{
         aplicaFrete((List<OrderItem>) Trigger.new);
         aplicaMargem((List<OrderItem>) Trigger.new);
         validaParametrosObrigatorios((List<OrderItem>) Trigger.new);
+        calculaPreco((List<OrderItem>) Trigger.new);
     }
 
     private void aplicaImposto(List<OrderItem>  novosItens){
@@ -326,6 +328,59 @@ public with sharing class OrderItemHandler extends TriggerHandler{
             else{
                 item.Custo_Producao__c = produto.Custo_Producao__c;
             }
+        }
+    }
+
+    private void calculaPreco(List<OrderItem> novosItens){
+
+        Set<Id> idsProdutos = new Set<Id>();
+        for (OrderItem item : novosItens){
+            if (item.Product2Id != null) idsProdutos.add(item.Product2Id);
+        }
+
+        //MAPEIA OS CUSTOS DE PRODUCAO DOS PRODUTOS
+        Map<Id, Product2> mapaProdutos = new Map<Id, Product2>([
+            SELECT Id, Custo_Producao__c 
+            FROM Product2
+            WHERE Id IN :idsProdutos
+        ]);
+
+        //FAZ O CALCULA PARA CADA PRODUTO NO PEDIDO
+        for (OrderItem item : novosItens){
+            
+            Product2 produto = mapaProdutos.get(item.Product2Id);
+
+            //VERIFICANDO SE CUSTO DE PRODUCAO EXISTE PARA GARINTIR QUE O CALCULO SEJA REALIZADO
+            if (produto != null && produto.Custo_Producao__c != null){
+                item.Custo_Producao__c = produto.Custo_Producao__c;
+            }
+
+            //CALCULO SO E FEITO SE TODOS OS PARAMETROS FOREM PASSADOS
+            if (item.Custo_Producao__c != null && item.Porcentagem_Imposto__c != null && item.Porcentagem_Margem__C != null && item.Porcentagem_Imposto__c != null){
+                
+                Decimal custoProducao = item.Custo_Producao__c;
+                Decimal frete = item.Valor_Frete__c;
+                Decimal imposto = item.Porcentagem_Imposto__c / 100;
+                Decimal margem = item.Porcentagem_Margem__c  / 100;
+
+                //PRECO SEM MARGEM
+                Decimal precoSemMargem = (custoProducao + frete) * (1 + imposto);
+                item.Preco_Sem_Margem__c = precoSemMargem;
+
+                //PRECO FINAL
+                Decimal precoFinal = (custoProducao + frete) * (1 + imposto) * (1 + margem);
+                item.Preco_Final__c = precoFinal;
+
+                //SE O PRECO FOR VALIDO, CALCULA O DESCONTO
+                if (precoFinal > 0 && item.Preco_Venda__c != null){
+
+                    Decimal desconto = (precoFinal - item.Preco_Venda__c) / precoFinal;
+                    item.Desconto__c = desconto * 100;
+                }
+                else{
+                    item.Desconto__c = 0.0;
+                }
+            } 
         }
     }
 }
