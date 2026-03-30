@@ -49,15 +49,13 @@ public with sharing class OrderItemHandler extends TriggerHandler{
                                             AND Produto__c IN :idsProdutos
                                             AND Centro_Distribuicao__c IN :idsCentrosDistribuicao
                                             AND Estado__c IN :idsEstados
-                                            ORDER BY CreatedDate DESC];
-
-
-        System.debug('QUANTOS IMPOSTOS O SOQL ACHOU? ' + impostosNoBanco.size() );
+                                            ORDER BY CreatedDate DESC
+        ];
        
        //MAPEIA IMPOSTOS ENCONTRADOS 
         Map<String, Decimal> mapaImpostoSobreCusto = new Map<String, Decimal>();
         for (Imposto__c imposto : impostosNoBanco){
-            String chave = '' + String.valueOf(imposto.Produto__c) + imposto.Centro_Distribuicao__c + imposto.Estado__c;
+            String chave = '' + String.valueOf(imposto.Produto__c) + String.valueOf(imposto.Centro_Distribuicao__c) + String.valueOf(imposto.Estado__c);
             mapaImpostoSobreCusto.put(chave, imposto.Imposto_Sobre_Custo__c);
         }
 
@@ -71,10 +69,9 @@ public with sharing class OrderItemHandler extends TriggerHandler{
             //CHAVE PARA O ITEM ATUAL
             String chaveBusca = '' + item.Product2Id + pedido.Centro_Distribuicao__c + idEstado;
             
-            //VERIFICA SE EXISTE IMPPOSTO PARA O ITEM ATUAL
+            //VERIFICA SE EXISTE IMPOSTO PARA O ITEM ATUAL
             if (mapaImpostoSobreCusto.containsKey(chaveBusca)){
                 item.Porcentagem_Imposto__c = mapaImpostoSobreCusto.get(chaveBusca);
-                System.debug('IMPOSTO APLICADO');
             }
         }
     }
@@ -112,10 +109,12 @@ public with sharing class OrderItemHandler extends TriggerHandler{
         Set<Id> idsHierarquias = new Set<Id>();
         Set<Id> idsCentroDistribuicao = new Set<Id>();
 
+        //ATRIBUI OS IDS DOS PARAMETROS PARA BUSCAR OS FRETES NO BANCO
         for (Product2 produto : produtosMapa.values()){
             if (produto.Hierarquia_Produto__c != null) idsHierarquias.add(produto.Hierarquia_Produto__c);
         }
 
+        //ATRIBUI OS IDS DOS PARAMETROS PARA BUSCAR OS FRETES NO BANCO
         for (Order pedido : pedidosMapa.values()){
             if (pedido.Endereco__r != null && pedido.Endereco__r.Cidade__c != null){
                 idsCidade.add(pedido.Endereco__r.Cidade__c);
@@ -139,7 +138,6 @@ public with sharing class OrderItemHandler extends TriggerHandler{
 
 
         //LOGICA DE ESPECIFIDADE
-
         for (OrderItem item : novosItens){
 
             Decimal valorFreteSelecionado = null;
@@ -216,11 +214,13 @@ public with sharing class OrderItemHandler extends TriggerHandler{
         Set<Id> idsEstados = new Set<Id>();
         Set<Id> idsPaises = new Set<Id>();
 
+        //ATRIBUI OS IDS DOS PARAMETROS DO PRODUTO PARA BUSCAR AS MARGENS NO BANCO
         for (Product2 produto : produtosMapa.values()){
             
             if (produto.Hierarquia_Produto__c != null) idsHierarquias.add(produto.Hierarquia_Produto__c);   
         }
 
+        //ATRIBUI OS IDS DOS PARAMETROS DO PEDIDO PARA BUSCAR AS MARGENS NO BANCO
         for (Order pedido : pedidosMapa.values()){
             
             if (pedido.AccountId != null) idsContas.add(pedido.AccountId);
@@ -345,7 +345,7 @@ public with sharing class OrderItemHandler extends TriggerHandler{
             WHERE Id IN :idsProdutos
         ]);
 
-        //FAZ O CALCULA PARA CADA PRODUTO NO PEDIDO
+        //FAZ O CALCULO PARA CADA PRODUTO NO PEDIDO
         for (OrderItem item : novosItens){
             
             Product2 produto = mapaProdutos.get(item.Product2Id);
@@ -371,7 +371,7 @@ public with sharing class OrderItemHandler extends TriggerHandler{
                 Decimal precoFinal = (custoProducao + frete) * (1 + imposto) * (1 + margem);
                 item.Preco_Final__c = precoFinal;
 
-                //SE O PRECO FOR VALIDO, CALCULA O DESCONTO
+                //SE O PRECO FINAL FOR VALIDO, CALCULA O DESCONTO
                 if (precoFinal > 0 && item.Preco_Venda__c != null){
 
                     Decimal desconto = (precoFinal - item.Preco_Venda__c) / precoFinal;
@@ -381,6 +381,17 @@ public with sharing class OrderItemHandler extends TriggerHandler{
                     item.Desconto__c = 0.0;
                 }
             } 
+        }
+    }
+
+    private void validaQuantidadePrecoZerados(List<OrderItem> novosItens){
+    
+        for (OrderItem item : novosItens){
+            
+            Boolean quantidadeInvalida = item.Quantidade__c == null || item.Quantidade__c <= 0;
+            Boolean precoInvalido = item.Preco_Venda__c == null || item.Preco_Venda__c <= 0;
+
+            if (quantidadeInvalida || precoInvalido) item.addError('Não é possível cadastrar produtos do pedido com quantidade ou preços zerados.');
         }
     }
 }
