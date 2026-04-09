@@ -1,61 +1,86 @@
 public with sharing class OrderItemHandler extends TriggerHandler{
 
     public override void beforeInsert(){
-        aplicaImposto((List<OrderItem>) Trigger.new);
-        aplicaFrete((List<OrderItem>) Trigger.new);
-        aplicaMargem((List<OrderItem>) Trigger.new);
-        validaParametrosObrigatorios((List<OrderItem>) Trigger.new);
-        calculaPreco((List<OrderItem>) Trigger.new);
+        processador((List<OrderItem>) Trigger.new);
     }
 
     public override void beforeUpdate(){
-        aplicaImposto((List<OrderItem>) Trigger.new);
-        aplicaFrete((List<OrderItem>) Trigger.new);
-        aplicaMargem((List<OrderItem>) Trigger.new);
-        validaParametrosObrigatorios((List<OrderItem>) Trigger.new);
-        calculaPreco((List<OrderItem>) Trigger.new);
+        processador((List<OrderItem>) Trigger.new);
     }
 
-    private void aplicaImposto(List<OrderItem>  novosItens){
+    //=============================================== PROCESSADOR ===========================================================
+    //deixar mais nome especifico
+    private void processador(List<OrderItem> novosItens){
 
         Set<Id> idsPedidos = new Set<Id>();
         Set<Id> idsProdutos = new Set<Id>();
 
         //COLETAR IDS DOS PEDIDOS E PRODUTOS
-        for(OrderItem item : novosItens){
-
+        for (OrderItem item : novosItens){
             if (item.OrderId != null) idsPedidos.add(item.OrderId);
             if (item.Product2Id != null) idsProdutos.add(item.Product2Id);
         }
 
-        //BUSCAR OS DADOS DO PEDIDO
-        Map<Id, Order> pedidosMapa = new Map<id, Order>([
-                SELECT Id, Centro_Distribuicao__c, Endereco__r.Cidade__r.Estado__c
-                FROM Order
-                WHERE Id IN :idsPedidos
+        //CONSULTA UNICA PARA PEDIDOS
+        Map<Id, Order> pedidosMapa = new Map<Id, Order>([
+            SELECT Id, AccountId, Account.Grupo_Clientes__c, Centro_Distribuicao__c,
+                   Endereco__r.Cidade__c, Endereco__r.Cidade__r.Estado__c, Endereco__r.Cidade__r.Estado__r.Pais__c
+            FROM Order
+            WHERE Id IN :idsPedidos
         ]);
 
-        Set<Id> idsCentrosDistribuicao = new Set<Id>();
+        //CONSULTA UNICA PARA PRODUTOS
+        Map<Id, Product2> produtosMapa = new Map<Id, Product2>([
+            SELECT Id, Hierarquia_Produto__c, Custo_Producao__c
+            FROM Product2
+            WHERE Id IN :idsProdutos
+        ]);
+
+        //CHAMA OS METODOS PASSANDO OS MAPAS DE PEDIDO E PRODUTOS PRONTOS
+        aplicaImposto(novosItens, pedidosMapa);
+        aplicaFrete(novosItens, pedidosMapa, produtosMapa);
+        aplicaMargem(novosItens, pedidosMapa, produtosMapa);
+        validaParametrosObrigatorios(novosItens, produtosMapa);
+        calculaPreco(novosItens, produtosMapa);
+    }
+
+    //=============================================== IMPOSTO ===========================================================
+    private void aplicaImposto(List<OrderItem>  novosItens, Map<Id, Order> pedidosMapa){
+
+        System.debug('==============================================================================================================');
+        System.debug('IMPOSTO');
+
+        Set<Id> idsProdutos = new Set<Id>();
+
+        //COLETAR IDS DOS PEDIDOS E PRODUTOS
+        for(OrderItem item : novosItens){
+
+            if (item.Product2Id != null) idsProdutos.add(item.Product2Id);
+        }
+
         Set<Id> idsEstados = new Set<Id>();
+        Set<Id> idsCD = new Set<Id>();
         for (Order pedido : pedidosMapa.values()){
-            if (pedido.Centro_Distribuicao__c != null) idsCentrosDistribuicao.add(pedido.Centro_Distribuicao__c);
             if (pedido.Endereco__r != null && pedido.Endereco__r.Cidade__r != null) idsEstados.add(pedido.Endereco__r.Cidade__r.Estado__c);
+            if (pedido.Centro_Distribuicao__c != null) idsCD.add(pedido.Centro_Distribuicao__c);
         }
 
         //BUSCA DE IMPOSTOS APROVADOS PRESENTES NO BANCO
-        List<Imposto__c> impostosNoBanco = [SELECT Id, Produto__c, Centro_Distribuicao__c, Estado__c, Imposto_Sobre_Custo__c
+        List<Imposto__c> impostosNoBanco = [SELECT Id, Produto__c,Estado__c, Imposto_Sobre_Custo__c, Centro_Distribuicao__c
                                             FROM Imposto__c
                                             WHERE Status__c = 'Aprovado'
                                             AND Produto__c IN :idsProdutos
-                                            AND Centro_Distribuicao__c IN :idsCentrosDistribuicao
                                             AND Estado__c IN :idsEstados
+                                            AND Centro_Distribuicao__c IN :idsCD
                                             ORDER BY CreatedDate DESC
-        ];
-       
+        ]; 
+
        //MAPEIA IMPOSTOS ENCONTRADOS 
         Map<String, Decimal> mapaImpostoSobreCusto = new Map<String, Decimal>();
         for (Imposto__c imposto : impostosNoBanco){
-            String chave = '' + String.valueOf(imposto.Produto__c) + String.valueOf(imposto.Centro_Distribuicao__c) + String.valueOf(imposto.Estado__c);
+
+            String chave = String.valueOf(imposto.Produto__c) + String.valueof(imposto.Centro_Distribuicao__c) + String.valueOf(imposto.Estado__c);
+            System.debug('Chave de impostos no banco que batem com os parametros do pedido: ' + chave);
             mapaImpostoSobreCusto.put(chave, imposto.Imposto_Sobre_Custo__c);
         }
 
@@ -67,41 +92,34 @@ public with sharing class OrderItemHandler extends TriggerHandler{
             Id idEstado = (pedido != null && pedido.Endereco__r != null && pedido.Endereco__r.Cidade__r != null) ? pedido.Endereco__r.Cidade__r.Estado__c : null;
 
             //CHAVE PARA O ITEM ATUAL
-            String chaveBusca = '' + item.Product2Id + pedido.Centro_Distribuicao__c + idEstado;
-            
+            String chaveBusca = String.valueOf(item.Product2Id) + String.valueOf(pedido.Centro_Distribuicao__c) + String.valueOf(idEstado);
+
             //VERIFICA SE EXISTE IMPOSTO PARA O ITEM ATUAL
             if (mapaImpostoSobreCusto.containsKey(chaveBusca)){
                 item.Porcentagem_Imposto__c = mapaImpostoSobreCusto.get(chaveBusca);
+                System.debug('IMPOSTO: Imposto aplicado de ' + item.porcentagem_Imposto__c + '% para o produto ' + item.Product2Id);
             }
+            else{
+                System.debug('Sem imposto cadastrado para este produto que bata com os parametros do pedido');
+                item.addError('Sem imposto cadastrada para este pedido');
+            }
+
+            System.debug('======================================================');
         }
     }
 
-    private void aplicaFrete(List<OrderItem>  novosItens){
+    //=============================================== FRETE ===========================================================
+    private void aplicaFrete(List<OrderItem>  novosItens, Map<Id, Order> pedidosMapa, Map<Id, Product2> produtosMapa){
 
-        Set<Id> idsPedidos = new Set<Id>();
+        System.debug(' ');
+        System.debug('=============================================================================================================='); 
+        System.debug('FRETE');
+
         Set<Id> idsProdutos = new Set<Id>();
 
         for (OrderItem item : novosItens){
-            if (item.OrderId != null) idsPedidos.add(item.OrderId);
             if (item.Product2Id != null) idsProdutos.add(item.Product2Id);
         }
-
-        //BUSCAR OS DADOS DO PEDIDO
-        Map<Id, Order> pedidosMapa = new Map<id, Order>([
-                SELECT Id, Centro_Distribuicao__c, Endereco__r.Cidade__c,
-                                                   Endereco__r.Cidade__r.Estado__c,
-                                                   Endereco__r.Cidade__r.Estado__r.Pais__c
-                FROM Order
-                WHERE Id IN :idsPedidos
-        ]);
-
-        //BUSCAR DADO DO PRODUTO
-        Map<Id, Product2> produtosMapa = new Map<Id, Product2>([
-                SELECT Id, Hierarquia_Produto__c
-                FROM Product2
-                WHERE Id IN :idsProdutos
-        ]);
-
 
         Set<Id> idsCidade = new Set<Id>();
         Set<Id> idsEstados = new Set<Id>();
@@ -119,6 +137,10 @@ public with sharing class OrderItemHandler extends TriggerHandler{
             if (pedido.Endereco__r != null && pedido.Endereco__r.Cidade__c != null){
                 idsCidade.add(pedido.Endereco__r.Cidade__c);
                 
+                if (pedido.Endereco__r.Cidade__r != null){
+                    idsEstados.add(pedido.Endereco__r.Cidade__r.Estado__c);
+                }
+
                 if (pedido.Endereco__r.Cidade__r.Estado__c != null){
                     idsPaises.add(pedido.Endereco__r.Cidade__r.Estado__r.Pais__c);
                 }
@@ -152,8 +174,8 @@ public with sharing class OrderItemHandler extends TriggerHandler{
 
                     //VERIFICA SE O FRETE ATENDE AO PEDIDO
                     Boolean atendeCD = (frete.Centro_Distribuicao__c != null && frete.Centro_Distribuicao__c == pedido.Centro_Distribuicao__c);
-                    Boolean atendeProduto = (frete.Produto__c != null && frete.Produto__c == produto.Id);
-                    Boolean atendeHierarquia = (frete.Hierarquia_Produto__c != null && frete.Hierarquia_Produto__c == produto.Hierarquia_Produto__c);
+                    Boolean atendeProduto = (frete.Produto__c != null && frete.Produto__c == produto.Id);                
+                    Boolean atendeHierarquia = (frete.Hierarquia_Produto__c != null && frete.Hierarquia_Produto__c == produto.Hierarquia_Produto__c);                    
                     Boolean atendeCidade = (frete.Cidade__c != null && frete.Cidade__c == pedido.Endereco__r.Cidade__c);
                     Boolean atendeEstado = (frete.Estado__c != null && frete.Estado__c == pedido.Endereco__r.Cidade__r.Estado__c);
                     Boolean atendePais = (frete.Pais__c != null && frete.Pais__c == pedido.Endereco__r.Cidade__r.Estado__r.Pais__c);
@@ -161,18 +183,15 @@ public with sharing class OrderItemHandler extends TriggerHandler{
                     //SE ATENDE OS PARAMETROS ESPECIFICOS DO PEDIDO APLICA A LOGICA DE ESPECIFIDADE
                     if (atendeCD && (atendeProduto || atendeHierarquia) && (atendeCidade || atendeEstado || atendePais)){
                         
-                        //FAZ UM SOMATORIO PARA VERIFICAR A ESPECIFIDADE DO FRETE DE ACORDO COM OS PARAMETROS
-                        Integer especifidade = 0;
-                        if (atendeProduto) especifidade += 2000;
-                        else if (atendeHierarquia) especifidade += 1000;
-
-                        if (atendeCidade) especifidade += 30;
-                        else if (atendeEstado) especifidade += 20;
-                        else if (atendePais) especifidade += 10;
+                        //TESTAR SE FICA MELHOR DESCENTRALIZANDO O CALCULO DE ESPECIFIDADE
+                        Integer especifidade = CalculaEspecifidade.calculaEspecifidade(atendeProduto, atendeHierarquia, atendeCidade, atendeEstado, atendePais, false, false);
                         
+                        System.debug('FRETE: Id do frete: ' + frete.Id + ' Valor: ' + frete.Valor__c  +' Especifidade: ' + especifidade);
+
                         if (especifidade > maiorEspecifidade){
                             maiorEspecifidade = especifidade;
                             valorFreteSelecionado = frete.Valor__c;
+                            System.debug('FRETE: Frete vencendo com valor ' + valorFreteSelecionado + ' e especificidade ' + maiorEspecifidade);
                         }
                     }
                 }
@@ -180,31 +199,30 @@ public with sharing class OrderItemHandler extends TriggerHandler{
 
             //ATRIBUI O FRETE SELECIONADO AO CAMPO VALOR DE FRETE EM PRODUTO DO PEDIDO
             if (valorFreteSelecionado != null){
+                System.debug('Valor de Especifidade de Frete selecionada: ' + valorFreteSelecionado + ' para o produto ' + item.Product2Id + ' com especifidade ' + maiorEspecifidade);
                 item.Valor_Frete__c = valorFreteSelecionado;
             }
+            else{
+                System.debug('FRETE: Nenhum frete bateu com os parametros do pedido');
+                item.addError('Sem frete cadastrada para este pedido');
+            }
+
+            System.debug('======================================================');
         }
     }
 
-    private void aplicaMargem(List<OrderItem> novosItens){
+    //=============================================== MARGEM ===========================================================
+    private void aplicaMargem(List<OrderItem> novosItens, Map<Id, Order> pedidosMapa, Map<Id, Product2> produtosMapa){
 
-        Set<Id> idsPedidos = new Set<Id>();
+        System.debug(' ');
+        System.debug('==============================================================================================================');
+        System.debug('MARGEM');
+        
         Set<Id> idsProdutos = new Set<Id>();
 
         for (OrderItem item : novosItens){
-            if (item.OrderId != null) idsPedidos.add(item.OrderId);
             if (item.Product2Id != null) idsProdutos.add(item.Product2Id);
         }
-
-        //BUSCAR OS DADOS DO PEDIDO
-        Map<Id, Order> pedidosMapa = new Map<Id, Order>([SELECT Id, Account.Grupo_Clientes__c, Centro_Distribuicao__c,
-                                                             Endereco__r.Cidade__c, Endereco__r.Cidade__r.Estado__c, Endereco__r.Cidade__r.Estado__r.Pais__c
-                                                         FROM Order
-                                                         WHERE Id IN :idsPedidos]);
-
-        //BUSCAR OS DADOS DO PRODUTO
-        Map<Id, Product2> produtosMapa = new Map<Id, Product2>([SELECT Id, Hierarquia_Produto__c
-                                                                FROM Product2
-                                                                WHERE Id IN :idsProdutos]);
 
         Set<Id> idsHierarquias = new Set<Id>();
         Set<Id> idsContas = new Set<Id>();
@@ -268,50 +286,42 @@ public with sharing class OrderItemHandler extends TriggerHandler{
                 //SE ATENDE OS PARAMETROS ESPECIFICOS DO PEDIDO APLICA A LOGICA DE ESPECIFIDADE
                 if (atendeCD && (atendeProduto || atendeHierarquia) && (atendeConta || atendeGrupoConta) && (atendeCidade || atendeEstado || atendePais )){
                     
-                    Integer especifidade = 0;
+                    Integer especifidade = CalculaEspecifidade.calculaEspecifidade(atendeProduto, atendeHierarquia, atendeCidade, atendeEstado, atendePais, atendeConta, atendeGrupoConta);
 
-                    //FAZ UM SOMATORIO PARA VERIFICAR A ESPECIFIDADE DA MARGEM DE ACORDO COM OS PARAMETROS
-                    if (atendeProduto) especifidade += 2000;
-                    else if (atendeHierarquia) especifidade += 1000;
+                    System.debug('MARGEM: Id da margem: ' + margem.Id + ' Valor: ' + margem.Valor__c  +'% Especifidade: ' + especifidade);
 
-                    if (atendeConta) especifidade += 200;
-                    else if (atendeGrupoConta) especifidade += 100;
-
-                    if (atendeCidade) especifidade += 30;
-                    else if (atendeEstado) especifidade += 20;
-                    else if (atendePais) especifidade += 10;
-                    
                     if (especifidade > maiorEspecifidade){
                         maiorEspecifidade = especifidade;
                         valorMargemSelecionado = margem.Valor__c;
+                        System.debug('MARGEM: Margem vencendo com valor ' + valorMargemSelecionado + ' e especificidade ' + maiorEspecifidade);
                     }
                 }
             }
 
             //ATRIBUI A MARGEM SELECIONADA AO CAMPO PORCENTAGEM DE MARGEM EM PRODUTO DO PEDIDO
             if (valorMargemSelecionado != null){
+                System.debug('Valor de Especifidade de Margem selecionada: ' + valorMargemSelecionado + '  para o produto ' + item.Product2Id + ' com especifidade ' + maiorEspecifidade);
                 item.Porcentagem_Margem__c = valorMargemSelecionado;
             }
+            else{
+                System.debug('MARGEM: Nenhuma margem bateu com os parametros do pedido');
+                item.addError('Sem margem cadastrada para este pedido');
+            }
+
+            System.debug('======================================================');
         }
     }
 
-    private void validaParametrosObrigatorios(List<OrderItem> novosItens){
+    //=============================================== VALIDACAO DE PARAMETROS ===========================================================
+    private void validaParametrosObrigatorios(List<OrderItem> novosItens, Map<Id, Product2> produtosMapa){
 
-        Set<Id> idsProdutos = new Set<Id>();
-        for (OrderItem item : novosItens){
-            if (item.Product2Id != null) idsProdutos.add(item.Product2Id);
-        }
-
-        //BUSCA O CUSTO DE PRODUCAO DE CADA PRODUTO
-        Map<Id, Product2> mapaProdutos = new Map<Id, Product2>([
-            SELECT Id, Custo_Producao__c 
-            FROM Product2
-            WHERE Id IN :idsProdutos
-        ]);
+        System.debug(' ');
+        System.debug('==============================================================================================================');
+        System.debug('VALIDAÇÃO DE PARÂMETROS OBRIGATÓRIOS');
 
         for (OrderItem item : novosItens){
 
-            Product2 produto = mapaProdutos.get(item.Product2Id);
+            Product2 produto = produtosMapa.get(item.Product2Id);
 
             //VERIFICA SE EXISTE CUSTO DE PRODUCAO NO CADASTRO DO PRODUTO
             Boolean temCusto = (produto != null && produto.Custo_Producao__c != null);
@@ -321,34 +331,35 @@ public with sharing class OrderItemHandler extends TriggerHandler{
             Boolean temFrete = (item.Valor_Frete__c != null);
             Boolean temMargem = (item.Porcentagem_Margem__c != null);
 
+            System.debug('temCusto: ' + temCusto);
+            System.debug('temImposto: ' + temImposto);
+            System.debug('temFrete: ' + temFrete);
+            System.debug('temMargem: ' + temMargem);
+
             //SE EXISTE ALGUM PARAMETRO FALTANDO, ADICIONA ERRO AO PRODUTO DO PEDIDO
             if (!temCusto || !temImposto || !temFrete || !temMargem){
+                //System.debug('Falta de parametros para o produto ' + item.Product2Id + ': Custo: ' + temCusto + ' Imposto: ' + temImposto + ' Frete: ' + temFrete + ' Margem: ' + temMargem);
                 item.addError('Não está autorizada a venda deste produto devido a falta de parâmetros, entre em contato com o time de pricing.');
             }
             else{
                 item.Custo_Producao__c = produto.Custo_Producao__c;
             }
+
+            System.debug('======================================================');
         }
     }
 
-    private void calculaPreco(List<OrderItem> novosItens){
+    //=============================================== CALCULO DE PRECO ===========================================================
+    private void calculaPreco(List<OrderItem> novosItens, Map<Id, Product2> produtosMapa){
 
-        Set<Id> idsProdutos = new Set<Id>();
-        for (OrderItem item : novosItens){
-            if (item.Product2Id != null) idsProdutos.add(item.Product2Id);
-        }
-
-        //MAPEIA OS CUSTOS DE PRODUCAO DOS PRODUTOS
-        Map<Id, Product2> mapaProdutos = new Map<Id, Product2>([
-            SELECT Id, Custo_Producao__c 
-            FROM Product2
-            WHERE Id IN :idsProdutos
-        ]);
+        System.debug(' ');
+        System.debug('==============================================================================================================');
+        System.debug('CÁLCULO DE PREÇO');
 
         //FAZ O CALCULO PARA CADA PRODUTO NO PEDIDO
         for (OrderItem item : novosItens){
             
-            Product2 produto = mapaProdutos.get(item.Product2Id);
+            Product2 produto = produtosMapa.get(item.Product2Id);
 
             //VERIFICANDO SE CUSTO DE PRODUCAO EXISTE PARA GARINTIR QUE O CALCULO SEJA REALIZADO
             if (produto != null && produto.Custo_Producao__c != null){
@@ -356,12 +367,14 @@ public with sharing class OrderItemHandler extends TriggerHandler{
             }
 
             //CALCULO SO E FEITO SE TODOS OS PARAMETROS FOREM PASSADOS
-            if (item.Custo_Producao__c != null && item.Porcentagem_Imposto__c != null && item.Porcentagem_Margem__C != null && item.Porcentagem_Imposto__c != null){
-                
+            if (item.Custo_Producao__c != null && item.Porcentagem_Imposto__c != null && item.Porcentagem_Margem__C != null && item.Porcentagem_Imposto__c != null && item.Valor_Frete__c != null){
+
                 Decimal custoProducao = item.Custo_Producao__c;
                 Decimal frete = item.Valor_Frete__c;
                 Decimal imposto = item.Porcentagem_Imposto__c / 100;
                 Decimal margem = item.Porcentagem_Margem__c  / 100;
+
+                System.debug('Calculando preço para o item ' + item.Product2Id + ' com: \ncusto de produção: ' + custoProducao + ' \nfrete: ' + frete + ' \nimposto: ' + (imposto*100) + '% \nmargem: ' + (margem*100) + '%');
 
                 //PRECO SEM MARGEM
                 Decimal precoSemMargem = (custoProducao + frete) * (1 + imposto);
@@ -372,26 +385,27 @@ public with sharing class OrderItemHandler extends TriggerHandler{
                 item.Preco_Final__c = precoFinal;
 
                 //SE O PRECO FINAL FOR VALIDO, CALCULA O DESCONTO
-                if (precoFinal > 0 && item.Preco_Venda__c != null){
+                if (precoFinal > 0 && item.UnitPrice != null){
 
-                    Decimal desconto = (precoFinal - item.Preco_Venda__c) / precoFinal;
-                    item.Desconto__c = desconto * 100;
+                    Decimal desconto = (precoFinal - item.UnitPrice) / precoFinal;
+
+                    if (desconto <= 0){
+                        item.Desconto__c = 0.0;
+                        item.Acrescimo__c = desconto * -100;
+                    }
+                    else{
+                        item.Desconto__c = desconto * 100;
+                        item.Acrescimo__c = 0.0;
+                    }
+                    
+                    System.debug('Preço final ideal calculado: ' + precoFinal + ' Preço de venda: ' + item.UnitPrice + ' Desconto aplicado: ' + (desconto*100) + '%');
                 }
                 else{
                     item.Desconto__c = 0.0;
                 }
+
+                System.debug('======================================================');
             } 
-        }
-    }
-
-    private void validaQuantidadePrecoZerados(List<OrderItem> novosItens){
-    
-        for (OrderItem item : novosItens){
-            
-            Boolean quantidadeInvalida = item.Quantidade__c == null || item.Quantidade__c <= 0;
-            Boolean precoInvalido = item.Preco_Venda__c == null || item.Preco_Venda__c <= 0;
-
-            if (quantidadeInvalida || precoInvalido) item.addError('Não é possível cadastrar produtos do pedido com quantidade ou preços zerados.');
         }
     }
 }

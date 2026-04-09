@@ -35,7 +35,7 @@ public with sharing class FreteHandler extends TriggerHandler {
             if (frete.Estado__c != null) idsEstados.add(frete.Estado__c);
             if (frete.Pais__c != null) idsPaises.add(frete.Pais__c);
 
-            if (frete.Id != null) idsFretesAtualizacao.add(frete.Id);
+            //if (frete.Id != null) idsFretesAtualizacao.add(frete.Id);
         }   
 
 

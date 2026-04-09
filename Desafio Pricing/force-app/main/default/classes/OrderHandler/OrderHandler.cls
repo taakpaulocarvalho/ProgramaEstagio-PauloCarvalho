@@ -8,7 +8,7 @@ public with sharing class OrderHandler extends TriggerHandler {
         validaAlteracoes((List<Order>) Trigger.new, (Map<Id, Order>) Trigger.oldMap);
     }
 
-    //APOS A ATUALIZACAO DE VALORES DE ENDERECO, CENTRO DE DISTRIBUICAO OU GRUPO DE CLIENTE EM PEDIDO
+    //APOS A ATUALIZACAO DE VALORES DE ENDERECO E CENTRO DE DISTRIBUICAO EM PEDIDO
     //CALCULA O PRECO DOS ITENS DO PEDIDO NOVAMENTE
     private void recalculaPreco(List<Order> novosPedidos, Map<Id, Order> antigosPedidos){
 
@@ -21,10 +21,9 @@ public with sharing class OrderHandler extends TriggerHandler {
 
             Boolean mudouEndereco = pedido.Endereco__c != pedidoAntigo.Endereco__c;
             Boolean mudouCentroDistribuicao = pedido.Centro_Distribuicao__c != pedidoAntigo.Centro_Distribuicao__c;
-            Boolean mudouGrupoCliente = pedido.Account.Grupo_Clientes__c != pedidoAntigo.Account.Grupo_Clientes__c;
 
             //SE ALGUM DOS PARAMETROS FOI ALTERADO, ADICIONA O PEDIDO NA LISTA DE IDS DE PEDIDOS QUE SERAO ATUALIZADOS
-            if (mudouEndereco || mudouCentroDistribuicao || mudouGrupoCliente){
+            if (mudouEndereco || mudouCentroDistribuicao){
                 idsPedidosAtualizados.add(pedido.Id);
             }
         }
@@ -36,14 +35,21 @@ public with sharing class OrderHandler extends TriggerHandler {
                                             WHERE OrderId IN :idsPedidosAtualizados
             ];
         
-            if (!itensPedidos.isEmpty()){
-
-                List<OrderItem> itensPedidosAtualizados = [SELECT Id FROM OrderItem
-                                                            WHERE OrderId IN :idsPedidosAtualizados
-                ];                                           
-
-                //ATUALIZA OS PEDIDOS COM O PRECO JA RECALCULADO
-                if (!itensPedidosAtualizados.isEmpty()) update itensPedidosAtualizados;
+            //ATUALIZA OS PEDIDOS COM O PRECO JA RECALCULADO
+            if (!itensPedidos.isEmpty()){     
+                System.debug('Itens dos pedidos que serão atualizados: ' + itenspedidos.size());
+                
+                try{
+                    update itensPedidos;
+                }
+                catch (DmlException erro){
+                    
+                    for (Order pedido : novosPedidos){
+                        if (idsPedidosAtualizados.contains(pedido.Id)){
+                            pedido.addError('Erro ao atualizar o pedido e seus itens devido a falta de parâmetros, entre em contato com o time de pricing.');
+                        }
+                    }
+                }
             }
         }
     }
