@@ -1,7 +1,7 @@
 public with sharing class ProdutoHandler extends TriggerHandler {
     
     public override void afterInsert(){
-        this.criar((List<Product2>) Trigger.new);
+        this.criarPricebookProduto((List<Product2>) Trigger.new);
     }
 
     //APOS A CRIACAO DE UM PRODUTO, CRIA O REGISTRO DE PRICEBOOKENTRY PARA O PRODUTO NO PRICEBOOK DE CATALOGO

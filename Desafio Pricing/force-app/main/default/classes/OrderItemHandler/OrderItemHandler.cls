@@ -1,16 +1,15 @@
 public with sharing class OrderItemHandler extends TriggerHandler{
 
     public override void beforeInsert(){
-        processador((List<OrderItem>) Trigger.new);
+        coletaPedidosProdutos((List<OrderItem>) Trigger.new);
     }
 
     public override void beforeUpdate(){
-        processador((List<OrderItem>) Trigger.new);
+        coletaPedidosProdutos((List<OrderItem>) Trigger.new);
     }
 
-    //=============================================== PROCESSADOR ===========================================================
-    //deixar mais nome especifico
-    private void processador(List<OrderItem> novosItens){
+    //=============================================== PROCESSADOR DE PEDIDOS E PRODUTOS ===========================================================
+    private void coletaPedidosProdutos(List<OrderItem> novosItens){
 
         Set<Id> idsPedidos = new Set<Id>();
         Set<Id> idsProdutos = new Set<Id>();
@@ -339,7 +338,7 @@ public with sharing class OrderItemHandler extends TriggerHandler{
             //SE EXISTE ALGUM PARAMETRO FALTANDO, ADICIONA ERRO AO PRODUTO DO PEDIDO
             if (!temCusto || !temImposto || !temFrete || !temMargem){
                 //System.debug('Falta de parametros para o produto ' + item.Product2Id + ': Custo: ' + temCusto + ' Imposto: ' + temImposto + ' Frete: ' + temFrete + ' Margem: ' + temMargem);
-                item.addError('Não está autorizada a venda deste produto devido a falta de parâmetros, entre em contato com o time de pricing.');
+                //item.addError('Não está autorizada a venda deste produto devido a falta de parâmetros, entre em contato com o time de pricing.');
             }
             else{
                 item.Custo_Producao__c = produto.Custo_Producao__c;
