@@ -5,114 +5,139 @@ private class OrderItemTest {
     @TestSetup
     static void makeData() {
         
-
         TestFactorySObject factory = TestFactorySObject.getInstance();
 
-        Grupo_Conta__c grupoConta = new Grupo_Conta__c();
-        grupoConta = (Grupo_Conta__c) factory.createSObject(grupoConta);
-        insert grupoConta;
+        Account_Group__c accountGroup = (Account_Group__c) factory.createSObject(new Account_Group__c());
+        insert accountGroup;
 
-        Account account = new Account(Grupo_Clientes__c = grupoConta.Id);
-        account = (Account) factory.createSObject(account);
+        Account account = (Account) factory.createSObject(new Account(Customer_Group__c = accountGroup.Id));
         insert account;
 
-        Pais__c pais = new Pais__c();
-        pais = (Pais__c) factory.createSObject(pais);
-        insert pais;
+        Country__c country = (Country__c) factory.createSObject(new Country__c());
+        insert country;
 
-        Estado__c estado = new Estado__c(Pais__c = pais.Id);
-        estado = (Estado__c) factory.createSObject(estado);
-        insert estado;
+        State__c state = (State__c) factory.createSObject(new State__c(Country__c = country.Id));
+        insert state;
 
-        Cidade__c cidade = new Cidade__c(Estado__c = estado.Id);
-        cidade = (Cidade__c) factory.createSObject(cidade);
-        insert cidade;
+        City__c city = (City__c) factory.createSObject(new City__c(State__c = state.Id));
+        insert city;
 
-        Endereco_Conta__c enderecoConta = new Endereco_Conta__c(Conta__c = account.Id, Cidade__c = cidade.Id);
-        enderecoConta = (Endereco_Conta__c) factory.createSObject(enderecoConta);
-        insert enderecoConta;
+        Account_Address__c accountAddress = (Account_Address__c) factory.createSObject(new Account_Address__c(Account__c = account.Id, City__c = city.Id));
+        insert accountAddress;
 
-        Centro_Distribuicao__c centroDistribuicao = new Centro_Distribuicao__c();
-        centroDistribuicao = (Centro_Distribuicao__c) factory.createSObject(centroDistribuicao);
-        insert centroDistribuicao;
+        Distribution_Center__c DC = (Distribution_Center__c) factory.createSObject(new Distribution_Center__c());
+        insert DC;
 
-        Condicao_Pagamento__c condicaoPagamento = new Condicao_Pagamento__c();
-        condicaoPagamento = (Condicao_Pagamento__c) factory.createSObject(condicaoPagamento);
-        insert condicaoPagamento;
+        Payment_Terms__c paymentTerms = (Payment_Terms__c) factory.createSObject(new Payment_Terms__c());
+        insert paymentTerms;
 
-        Hierarquia_Produto__c hierarquiaProduto = new Hierarquia_Produto__c();
-        hierarquiaProduto = (Hierarquia_Produto__c) factory.createSObject(hierarquiaProduto);
-        insert hierarquiaProduto;
+        Product_Hierarchy__c productHierarchy = (Product_Hierarchy__c) factory.createSObject(new Product_Hierarchy__c());
+        insert productHierarchy;
 
-        TriggerHandler.bypass('ProdutoHandler');
-        Product2 produto = new Product2(Hierarquia_Produto__c = hierarquiaProduto.Id, Custo_Producao__c = 0);
-        produto = (Product2) factory.createSObject(produto);
-        insert produto;
-
+        Product2 product = (Product2) factory.createSObject(new Product2(Product_Hierarchy__c = productHierarchy.Id, Production_Cost__c = 0));
+        insert product;
 
         //CRIANDO DADOS PARA IMPOSTO
-        Imposto__c imp = (Imposto__c) factory.createSObject(new Imposto__c(Centro_Distribuicao__c = centroDistribuicao.Id, Estado__c = estado.Id, Produto__c = produto.Id, Imposto_Sobre_Custo__c = 10));
-        insert imp;
+        Tax__c tax = (Tax__c) factory.createSObject(new Tax__c(Distribution_Center__c = DC.Id, State__c = state.Id, Product__c = product.Id, Tax_On_Cost__c = 10));
+        insert tax;
 
         //CRIANDO DADOS PARA MARGEM
-        Margem__c margem = new Margem__c(Centro_Distribuicao__c = centroDistribuicao.Id, Conta__c = account.Id, Produto__c = produto.Id, Cidade__c = cidade.Id, Valor__c = 20);
-        margem = (Margem__c) factory.createSObject(margem);
-        insert margem;
+        Margin__c margin = (Margin__c) factory.createSObject(new Margin__c(Distribution_Center__c = DC.Id, Account__c = account.Id, Product__c = product.Id, City__c = city.Id, Value__c = 20));
+        insert margin;
 
-        Margem__c margem2 = (Margem__c) factory.createSObject(new Margem__c(Centro_Distribuicao__C = centroDistribuicao.Id, Conta__c = account.Id, Hierarquia_Produto__c = hierarquiaProduto.Id, Estado__c = estado.Id, Valor__c = 40));
-        insert margem2;
+        Margin__c margin2 = (Margin__c) factory.createSObject(new Margin__c(Distribution_Center__C = DC.Id, Account__c = account.Id, Product_Hierarchy__c = productHierarchy.Id, State__c = state.Id, Value__c = 40));
+        insert margin2;
 
-        Margem__c margem3 = (Margem__c) factory.createSObject(new Margem__c(Centro_Distribuicao__C = centroDistribuicao.Id, Conta__c = account.Id, Hierarquia_Produto__c = hierarquiaProduto.Id, Pais__c = pais.Id, Valor__c = 40));
-        insert margem3;
+        Margin__c margin3 = (Margin__c) factory.createSObject(new Margin__c(Distribution_Center__C = DC.Id, Account__c = account.Id, Product_Hierarchy__c = productHierarchy.Id, Country__c = country.Id, Value__c = 40));
+        insert margin3;
 
         //CRIANDO DADOS PARA FRETE
-        Frete__c frete = new Frete__c(Centro_Distribuicao__c = centroDistribuicao.Id, Cidade__c = cidade.Id, Produto__c = produto.Id, Valor__c = 100, Status__c = 'Aprovado');
-        frete = (Frete__c) factory.createSObject(frete);
-        insert frete;
+        Freight__c freight = (Freight__c) factory.createSObject(new Freight__c(Distribution_Center__c = DC.Id, City__c = city.Id, Product__c = product.Id, Value__c = 0, Status__c = 'Aprovado'));
+        insert freight;
 
-        Frete__c frete2 = (Frete__c) factory.createSObject(new Frete__c(Centro_Distribuicao__c = centroDistribuicao.Id, Estado__c = estado.Id, Hierarquia_Produto__c = hierarquiaProduto.Id, Valor__c = 100, Status__c = 'Aprovado'));
-        insert frete2;
+        Freight__c freight2 = (Freight__c) factory.createSObject(new Freight__c(Distribution_Center__c = DC.Id, State__c = state.Id, Product_Hierarchy__c = productHierarchy.Id, Value__c = 10, Status__c = 'Aprovado'));
+        insert freight2;
 
-        Frete__c frete3 = (Frete__c) factory.createSObject(new Frete__c(Centro_Distribuicao__c = centroDistribuicao.Id, Pais__c = pais.Id, Hierarquia_Produto__c = hierarquiaProduto.Id, Valor__c = 200, Status__c = 'Aprovado'));
-        insert frete3;
+        Freight__c freight3 = (Freight__c) factory.createSObject(new Freight__c(Distribution_Center__c = DC.Id, Country__c = country.Id, Product_Hierarchy__c = productHierarchy.Id, Value__c = 10, Status__c = 'Aprovado'));
+        insert freight3;
 
-        Id standardPbId = Test.getStandardPricebookId();
-        PricebookEntry pbe = new PricebookEntry(Product2Id = produto.Id, Pricebook2Id = standardPbId, UnitPrice = 100, IsActive = true);
-        insert pbe;
+        PricebookEntry pbe = [SELECT Pricebook2Id FROM PricebookEntry WHERE Product2Id = :product.Id LIMIT 1];
 
         //CRIANDO ORDER
-        Order pedido = new Order(AccountId = account.Id, Centro_Distribuicao__c = centroDistribuicao.Id, Condicao_Pagamento__c = condicaoPagamento.Id, Endereco__c = enderecoConta.Id, Pricebook2Id = standardPbId);
-        pedido = (Order) factory.createSObject(pedido);
-        insert pedido;
-
-        //CRIANDO ORDER ITEM
-        // OrderItem item = new OrderItem(OrderId = pedido.Id, Product2Id = produto.Id, Quantity = 10, UnitPrice = 100, PricebookEntryId = pbe.Id);
-        // item = (OrderItem) TestFactorySObject.getInstance().createSObject(item);
-        // insert item;
-
+        Order order = new Order(AccountId = account.Id, Distribution_Center__c = DC.Id, Payment_Terms__c = paymentTerms.Id, Address__c = accountAddress.Id, Pricebook2Id = pbE.Pricebook2Id);
+        order = (Order) factory.createSObject(order);
+        insert order;
     }
 
     @isTest
-    static void calculaPrecoTest(){
+    static void calculatePriceZeroTest(){
 
+        TestFactorySObject factory = TestFactorySObject.getInstance();
 
-        Order pedido = [SELECT Id FROM Order LIMIT 1];
-        Product2 produto = [SELECT Id FROM Product2 LIMIT 1];
+        Order order = [SELECT Id FROM Order LIMIT 1];
+        Product2 product = [SELECT Id FROM Product2 LIMIT 1];   
         PricebookEntry pbe = [SELECT Id from PricebookEntry LIMIT 1];
 
-        OrderItem item = new OrderItem(OrderId = pedido.Id, Product2Id = produto.Id, Quantity = 10, UnitPrice = 100, PricebookEntryId = pbe.Id);
+        OrderItem item = new OrderItem(OrderId = order.Id, Product2Id = product.Id, Quantity = 10, UnitPrice = 50, PricebookEntryId = pbe.Id);
         item = (OrderItem) TestFactorySObject.getInstance().createSObject(item);
         
+
         Test.startTest();
         try{
             insert item;
-            System.assert(false, 'Não é possível recalcular o preço de um pedido que já está Ativado');
+            OrderItem itemFound = [SELECT Id, Final_Price__c FROM OrderItem LIMIT 1];
+            System.assertEquals(itemFound.Final_Price__c, 0);
         }
         catch (Exception e){
-            System.assert(e.getMessage().contains('Erro ao atualizar o pedido e seus itens devido a falta de parâmetros, entre em contato com o time de pricing.'), 'Erro: ' + e.getMessage());
+            System.assert(e.getMessage().contains('Erro ao inserir o pedido e seus itens devido a falta de parâmetros, entre em contato com o time de pricing.'), 'Erro: ' + e.getMessage());
         }
 
         Test.stopTest();
     }
 
+    @isTest
+    static void calculateDiscountPriceGreaterThanZeroTest(){
+
+        TestFactorySObject factory = TestFactorySObject.getInstance();
+
+        Account account = [SELECT Id FROM Account LIMIT 1];
+        Distribution_Center__c DC = [SELECT Id FROM Distribution_Center__c LIMIT 1];
+        Product_Hierarchy__c productHierarchy = [SELECT Id FROM Product_Hierarchy__c LIMIT 1];
+        Country__c country = [SELECT Id FROM Country__c LIMIT 1];
+        State__c state = [SELECT Id FROM State__c LIMIT 1];
+        City__c city = [SELECT Id FROM City__c LIMIT 1];
+        Payment_Terms__c paymentTerms = [SELECT Id FROM Payment_Terms__c LIMIT 1];
+        Account_Address__c accountAddress = [SELECT Id FROM Account_Address__c LIMIT 1];
+        
+        Product2 product = (Product2) factory.createSObject(new Product2(Product_Hierarchy__c = productHierarchy.Id, Production_Cost__c = 100));
+        insert product;
+
+        PricebookEntry pbe = [SELECT Pricebook2Id FROM PricebookEntry WHERE Product2Id = :product.Id LIMIT 1];
+
+        Freight__c freight = (Freight__c) factory.createSObject(new Freight__c(Distribution_Center__c = DC.Id, Country__c = country.Id, Product__c = product.Id, Value__c = 10, Status__c = 'Aprovado'));
+        insert freight;
+
+        Tax__c tax = (Tax__c) factory.createSObject(new Tax__c(Distribution_Center__c = DC.Id, State__c = state.Id, Product__c = product.Id, Tax_On_Cost__c = 10));
+        insert tax;
+
+        Margin__c margin = (Margin__c) factory.createSObject(new Margin__c(Distribution_Center__c = DC.Id, Account__c = account.Id, Product__c = product.Id, Country__c = country.Id, Value__c = 20)) ;
+        insert margin;
+
+        Order order = (Order) factory.createSObject(new Order(AccountId = account.Id, Distribution_Center__c = DC.Id, Payment_Terms__c = paymentTerms.Id, Address__c = accountAddress.Id, Pricebook2Id = pbe.Pricebook2Id)); 
+        insert order;
+
+        OrderItem item = (OrderItem) factory.createSObject(new OrderItem(OrderId = order.Id, Product2Id = product.Id, Quantity = 10, UnitPrice = 50, PricebookEntryId = pbe.Id));
+        
+        Test.startTest();
+        try{
+            insert item;
+            OrderItem itemFound = [SELECT Id, Discount__c FROM OrderItem LIMIT 1];
+            System.Assert(itemFound.Discount__c > 0, 'O desconto deveria ser maior que zero.');
+        }
+        catch (Exception e){
+            System.assert(e.getMessage().contains('Erro ao inserir o pedido e seus itens devido a falta de parâmetros, entre em contato com o time de pricing.'), 'Erro: ' + e.getMessage());
+        }
+
+        Test.stopTest();
+    }
 }

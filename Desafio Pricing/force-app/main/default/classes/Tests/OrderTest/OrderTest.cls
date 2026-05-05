@@ -6,93 +6,76 @@ private class OrderTest {
         
         TestFactorySObject factory = TestFactorySObject.getInstance();
 
-        Grupo_Conta__c grupoConta = new Grupo_Conta__c();
-        grupoConta = (Grupo_Conta__c) factory.createSObject(grupoConta);
-        insert grupoConta;
+        Account_Group__c accountGroup = (Account_Group__c) factory.createSObject(new Account_Group__c());
+        insert accountGroup;
 
-        Account account = new Account(Grupo_Clientes__c = grupoConta.Id);
-        account = (Account) factory.createSObject(account);
+        Account account = (Account) factory.createSObject(new Account(Customer_Group__c = accountGroup.Id));
         insert account;
 
-        Pais__c pais = new Pais__c();
-        pais = (Pais__c) factory.createSObject(pais);
-        insert pais;
+        Country__c Country = (Country__c) factory.createSObject(new Country__c());
+        insert Country;
 
-        Estado__c estado = new Estado__c(Pais__c = pais.Id);
-        estado = (Estado__c) factory.createSObject(estado);
-        insert estado;
+        State__c state = (State__c) factory.createSObject(new State__c(Country__c = Country.Id));
+        insert state;
 
-        Cidade__c cidade = new Cidade__c(Estado__c = estado.Id);
-        cidade = (Cidade__c) factory.createSObject(cidade);
-        insert cidade;
+        City__c city = (City__c) factory.createSObject(new City__c(State__c = state.Id));
+        insert city;
 
-        Endereco_Conta__c enderecoConta = new Endereco_Conta__c(Conta__c = account.Id, Cidade__c = cidade.Id);
-        enderecoConta = (Endereco_Conta__c) factory.createSObject(enderecoConta);
-        insert enderecoConta;
+        Account_Address__c accountAddress = (Account_Address__c) factory.createSObject(new Account_Address__c(Account__c = account.Id, City__c = city.Id));
+        insert accountAddress;
 
-        Centro_Distribuicao__c centroDistribuicao = new Centro_Distribuicao__c();
-        centroDistribuicao = (Centro_Distribuicao__c) factory.createSObject(centroDistribuicao);
-        insert centroDistribuicao;
+        Distribution_Center__c DC = (Distribution_Center__c) factory.createSObject(new Distribution_Center__c());
+        insert DC;
 
-        Condicao_Pagamento__c condicaoPagamento = new Condicao_Pagamento__c();
-        condicaoPagamento = (Condicao_Pagamento__c) factory.createSObject(condicaoPagamento);
-        insert condicaoPagamento;
+        Payment_Terms__c paymentTerms = (Payment_Terms__c) factory.createSObject(new Payment_Terms__c());
+        insert paymentTerms;
 
-        Hierarquia_Produto__c hierarquiaProduto = new Hierarquia_Produto__c();
-        hierarquiaProduto = (Hierarquia_Produto__c) factory.createSObject(hierarquiaProduto);
-        insert hierarquiaProduto;
+        Product_Hierarchy__c productHierarchy = (Product_Hierarchy__c) factory.createSObject(new Product_Hierarchy__c());
+        insert productHierarchy;
 
-        TriggerHandler.bypass('ProdutoHandler');
-        Product2 produto = new Product2(Hierarquia_Produto__c = hierarquiaProduto.Id, Custo_Producao__c = 100);
-        produto = (Product2) factory.createSObject(produto);
-        insert produto;
-
+        Product2 product = (Product2) factory.createSObject(new Product2(Product_Hierarchy__c = productHierarchy.Id, Production_Cost__c = 100));
+        insert product;
 
         //CRIANDO DADOS PARA IMPOSTO
-        Imposto__c imp = (Imposto__c) factory.createSObject(new Imposto__c(Centro_Distribuicao__c = centroDistribuicao.Id, Estado__c = estado.Id, Produto__c = produto.Id, Imposto_Sobre_Custo__c = 10));
-        insert imp;
+        Tax__c tax = (Tax__c) factory.createSObject(new Tax__c(Distribution_Center__c = DC.Id, State__c = state.Id, Product__c = product.Id, Tax_On_Cost__c = 10));
+        insert tax;
 
         //CRIANDO DADOS PARA MARGEM
-        Margem__c margem = new Margem__c(Centro_Distribuicao__c = centroDistribuicao.Id, Conta__c = account.Id, Produto__c = produto.Id, Cidade__c = cidade.Id, Valor__c = 20);
-        margem = (Margem__c) factory.createSObject(margem);
-        insert margem;
+        Margin__c margin = (Margin__c) factory.createSObject(new Margin__c(Distribution_Center__c = DC.Id, Account__c = account.Id, Product__c = product.Id, City__c = city.Id, Value__c = 20));
+        insert margin;
 
         //CRIANDO DADOS PARA FRETE
-        Frete__c frete = new Frete__c(Centro_Distribuicao__c = centroDistribuicao.Id, Cidade__c = cidade.Id, Produto__c = produto.Id, Valor__c = 100, Status__c = 'Aprovado');
-        frete = (Frete__c) factory.createSObject(frete);
-        insert frete;
+        Freight__c freight = (Freight__c) factory.createSObject(new Freight__c(Distribution_Center__c = DC.Id, City__c = city.Id, Product__c = product.Id, Value__c = 100, Status__c = 'Aprovado'));
+        insert freight;
 
-        Id standardPbId = Test.getStandardPricebookId();
-        PricebookEntry pbe = new PricebookEntry(Product2Id = produto.Id, Pricebook2Id = standardPbId, UnitPrice = 100, IsActive = true);
-        insert pbe;
+        PricebookEntry pbe = [SELECT Pricebook2Id FROM PricebookEntry WHERE Product2Id = :product.Id LIMIT 1];
 
-        Order pedido = new Order(AccountId = account.Id, Centro_Distribuicao__c = centroDistribuicao.Id, Condicao_Pagamento__c = condicaoPagamento.Id, Endereco__c = enderecoConta.Id, Pricebook2Id = pbe.Pricebook2Id);
-        pedido = (Order) factory.createSObject(pedido);
-        insert pedido;
+        Order order = (Order) factory.createSObject(new Order(AccountId = account.Id, Distribution_Center__c = DC.Id, Payment_Terms__c = paymentTerms.Id, Address__c = accountAddress.Id, Pricebook2Id = pbe.Pricebook2Id));
+        insert order;
 
-        OrderItem item = new OrderItem(OrderId = pedido.Id, Product2Id = produto.Id, Quantity = 10, UnitPrice = 1000000, PricebookEntryId = pbe.Id);
-        item = (OrderItem) TestFactorySObject.getInstance().createSObject(item);
+        OrderItem item = new OrderItem(OrderId = order.Id, Product2Id = product.Id, Quantity = 10, UnitPrice = 1000000, PricebookEntryId = pbe.Id);
+        item = (OrderItem) factory.createSObject(item);
         insert item;
     }
 
     @isTest
     static void validaAlteracoesTest(){
 
-        Order pedido = [SELECT Id, AccountId, Centro_Distribuicao__c, Condicao_Pagamento__c, Endereco__c FROM Order LIMIT 1];
+        Order order = [SELECT Id, AccountId, Distribution_Center__c, Payment_Terms__c, Address__c FROM Order LIMIT 1];
 
         Test.startTest();
 
-        pedido.Status = 'Activated';
-        update pedido;
+        order.Status = 'Activated';
+        update order;
 
         try{
-            pedido.AccountId = null;
-            pedido.Centro_Distribuicao__c = null;
-            pedido.Condicao_Pagamento__c = null;
-            pedido.Endereco__c = null;
-            pedido.Status = 'Draft';
+            order.AccountId = null;
+            order.Distribution_Center__c = null;
+            order.Payment_Terms__c = null;
+            order.Address__c = null;
+            order.Status = 'Draft';
 
-            update pedido;
+            update order;
             System.assert(false, 'Não é possível atualizar um pedido que ja está Ativado');
         }
         catch (DmlException e){
@@ -105,17 +88,17 @@ private class OrderTest {
     @isTest
     static void recalculaPrecoTest(){
 
-        Centro_Distribuicao__c centroRecalculo = new Centro_Distribuicao__c();
-        centroRecalculo = (Centro_Distribuicao__c) TestFactorySObject.getInstance().createSObject(centroRecalculo);
-        insert centroRecalculo;
+        Distribution_Center__c DCChanged = new Distribution_Center__c();
+        DCChanged = (Distribution_Center__c) TestFactorySObject.getInstance().createSObject(DCChanged);
+        insert DCChanged;
 
-        Order pedido = [SELECT Id FROM Order LIMIT 1];
-        pedido.Centro_Distribuicao__c = centroRecalculo.Id;
+        Order order = [SELECT Id FROM Order LIMIT 1];
+        order.Distribution_Center__c = DCChanged.Id;
 
         Test.startTest();
 
         try{
-            update pedido;
+            update order;
             System.assert(false, 'Não é possível recalcular o preço de um pedido que já está Ativado');
         }
         catch (Exception e){
@@ -124,6 +107,4 @@ private class OrderTest {
 
         Test.stopTest();
     }
-
-
 }
