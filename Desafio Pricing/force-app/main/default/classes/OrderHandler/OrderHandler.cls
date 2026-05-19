@@ -6,6 +6,7 @@ public with sharing class OrderHandler extends TriggerHandler {
 
     public override void beforeUpdate(){
         validateChanges((List<Order>) Trigger.new, (Map<Id, Order>) Trigger.oldMap);
+        changedStatus((List<Order>) Trigger.new, (Map<Id, Order>) Trigger.oldMap);  
     }
 
     //APOS A ATUALIZACAO DE VALORES DE ENDERECO E CENTRO DE DISTRIBUICAO EM PEDIDO
@@ -68,5 +69,56 @@ public with sharing class OrderHandler extends TriggerHandler {
                 order.addError('Não é possível fazer qualquer alteração em um pedido que está Ativo');
             }
         }   
+    }
+
+    private void changedStatus(List<Order> newOrders, Map<Id, Order> oldOrders){
+
+        List<OrderItem> orderItems = [SELECT Id, Final_Price__c, UnitPrice, Quantity
+                                        FROM OrderItem
+                                        WHERE OrderId IN :newOrders
+                                    ];
+
+
+        for (Order order : newOrders){
+
+            Order oldOrder = oldOrders.get(order.Id);
+            
+            if (order.Status != 'In Approval' && oldOrder.Status != 'New'){
+
+                order.addError('Não é possível alterar o status do pedido para In Approval a partir de um status diferente de New');
+            }
+
+            if (order.Status != 'New' && orderItems.isEmpty()){
+
+                order.addError('Não é possível alterar o status do pedido se ele não possuir itens');
+            }
+
+            Decimal totalDiscount = calculateTotalDiscount(orderItems);
+
+            if (order.Status == 'In Approval' && totalDiscount < 0.2){
+                
+                System.debug('Total Discount: ' + (totalDiscount * 100) + '%');
+                order.addError('Não é possível alterar o status do pedido para Approved se o desconto total for maior que 20%');
+            }
+            else{
+                order.Status = 'Approved';
+            }
+        }
+    }
+
+    private Decimal calculateTotalDiscount(List<OrderItem> orderItems){
+        Decimal totalDiscount = 0;
+        Decimal totalFinalPrice = 0;
+        Decimal totalUnitPrice = 0;
+
+        for (OrderItem item : orderItems){
+            
+            totalFinalPrice += (item.Final_Price__c * item.Quantity);
+            totalUnitPrice += (item.UnitPrice * item.Quantity);
+        }
+
+        totalDiscount = (totalFinalPrice - totalUnitPrice) / totalFinalPrice;
+
+        return totalDiscount;
     }
 }

@@ -3,6 +3,23 @@ public with sharing class TemplateDefaultFields {
         Map<String, Object> getFieldDefaults(Decimal countSObjectCreated);
     }
 
+    public class UserDefaults implements FieldDefaults {
+		public Map<String, Object> getFieldDefaults(Decimal countSObjectCreated) {
+			return new Map<String, Object>{
+				'ExternalId__c' => '10' + countSObjectCreated,
+				'Username' => 'test' + Datetime.now().getTime() +'@test.com',
+				'LastName' => 'inquima',
+				'Email' => 'inquima@inquima.com',
+				'Alias' => 'inquima',
+				'CommunityNickname' => 'inquima',
+				'TimeZoneSidKey' => 'America/Sao_Paulo',
+				'LocaleSidKey' => 'pt_BR',
+				'EmailEncodingKey' => 'ISO-8859-1',
+				'LanguageLocaleKey' => 'pt_BR'
+			};
+		}
+	}
+
     public class AccountGroupDefaults implements FieldDefaults {
 
         public Map <String, Object> getFieldDefaults(Decimal countSObjectCreated) {
@@ -67,7 +84,8 @@ public with sharing class TemplateDefaultFields {
         public Map<String, Object> getFieldDefaults(Decimal countSObjectCreated){
             return new Map<String, Object>{
                 'Name' => 'Produto ' + countSObjectCreated,
-                'ProductCode' => 'P- ' + countSObjectCreated
+                'ProductCode' => 'P- ' + countSObjectCreated,
+                'ExternalId__c' => 'Product2' + countSObjectCreated
             };
         }
     }
@@ -142,7 +160,8 @@ public with sharing class TemplateDefaultFields {
                 'EffectiveDate' => Date.today(),
                 'Status' => 'Draft',
                 'Type_Of_Shipping__c' => 'CIF',
-                'Delivery_Date__c' => Date.today().addDays(7)
+                'Delivery_Date__c' => Date.today().addDays(7),
+                'ExternalId__c' => 'OrderExternalId' + countSObjectCreated
 
             };
         }
@@ -152,8 +171,38 @@ public with sharing class TemplateDefaultFields {
 
         public Map<String, Object> getFieldDefaults(Decimal countSObjectCreated){
             return new Map<String, Object>{
+                'ExternalId__c' => 'OrderItemExternalId' + countSObjectCreated
             };
         }
     }
 
+
+    public class PricebookEntryDefaults implements FieldDefaults {
+
+        public Map<String, Object> getFieldDefaults(Decimal countSObjectCreated){
+            return new Map<String, Object>{
+                'IsActive' => true,
+                'ExternalId__c' => 'PricebookEntry' + countSObjectCreated
+            };
+        }
+    }
+
+    public class IntegrationSettingDefaults implements FieldDefaults {
+		public Map<String, Object> getFieldDefaults(Decimal countSObjectCreated) {
+			return new Map<String, Object>{
+				'Name' => 'IntegrationSettingName',
+				'Method__c' => 'POST',
+				'Endpoint__c' => 'Endpoint',
+				'User__c' => UserInfo.getUserName(),
+				'Password__c' => UserInfo.getUserName(),
+				'Timeout__c' => 110000,
+				'AccessToken__c' => 'AccessToken' + String.valueOf(Datetime.now()),
+				'ClientId__c' => String.valueOf(Datetime.now()),
+				'ClientSecret__c' => UserInfo.getUserName() + String.valueOf(Datetime.now()),
+				'EndpointAccessToken__c' => 'EndpointAccessToken',
+				'AccessTokenTime__c' => 360000,
+				'LastAccessTokenTime__c' => Decimal.valueOf(Datetime.now().getTime())
+			};
+		}
+	}
 }

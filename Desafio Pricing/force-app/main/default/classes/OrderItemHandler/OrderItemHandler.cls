@@ -337,8 +337,8 @@ public with sharing class OrderItemHandler extends TriggerHandler{
 
             //SE EXISTE ALGUM PARAMETRO FALTANDO, ADICIONA ERRO AO PRODUTO DO PEDIDO
             if (!hasProductionCost || !hasTax || !hasFreight || !hasMargin){
-                //System.debug('Falta de parametros para o produto ' + item.Product2Id + ': Custo: ' + temCusto + ' Tax: ' + temTax + ' Freight: ' + temFreight + ' Margin: ' + temMargin);
-                item.addError('Não está autorizada a venda deste produto devido a falta de parâmetros, entre em contato com o time de pricing.');
+                System.debug('Falta de parametros para o produto ' + item.Product2Id + ': Custo: ' + hasProductionCost + ' Tax: ' + hasTax + ' Freight: ' + hasFreight + ' Margin: ' + hasMargin);
+                //item.addError('Não está autorizada a venda deste produto devido a falta de parâmetros, entre em contato com o time de pricing.');
             }
             else{
                 item.Production_Cost__c = product.Production_Cost__c;
