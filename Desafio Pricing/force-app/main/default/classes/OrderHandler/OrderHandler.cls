@@ -6,7 +6,8 @@ public with sharing class OrderHandler extends TriggerHandler {
 
     public override void beforeUpdate(){
         validateChanges((List<Order>) Trigger.new, (Map<Id, Order>) Trigger.oldMap);
-        changedStatus((List<Order>) Trigger.new, (Map<Id, Order>) Trigger.oldMap);  
+        validateIntegration((List<Order>) Trigger.new, (Map<Id, Order>) Trigger.oldMap); 
+        
     }
 
     //APOS A ATUALIZACAO DE VALORES DE ENDERECO E CENTRO DE DISTRIBUICAO EM PEDIDO
@@ -58,6 +59,8 @@ public with sharing class OrderHandler extends TriggerHandler {
     //VALIDACOES DE ALTERACAO DE PEDIDO
     private void validateChanges(List<Order> newOrders, Map<Id, Order> oldOrders){
         
+        List<OrderItem> items = [SELECT Id FROM OrderItem WHERE OrderId IN :newOrders LIMIT 1];
+
         for (Order order : newOrders){
             Order oldOrder = oldOrders.get(order.Id);
 
@@ -68,57 +71,40 @@ public with sharing class OrderHandler extends TriggerHandler {
             if (oldOrder.Status == 'Activated'){
                 order.addError('Não é possível fazer qualquer alteração em um pedido que está Ativo');
             }
-        }   
-    }
 
-    private void changedStatus(List<Order> newOrders, Map<Id, Order> oldOrders){
-
-        List<OrderItem> orderItems = [SELECT Id, Final_Price__c, UnitPrice, Quantity
-                                        FROM OrderItem
-                                        WHERE OrderId IN :newOrders
-                                    ];
-
-
-        for (Order order : newOrders){
-
-            Order oldOrder = oldOrders.get(order.Id);
-            
-            if (order.Status != 'In Approval' && oldOrder.Status != 'New'){
-
-                order.addError('Não é possível alterar o status do pedido para In Approval a partir de um status diferente de New');
-            }
-
-            if (order.Status != 'New' && orderItems.isEmpty()){
-
+            if (items.isEmpty() && order.Status != 'New'){
                 order.addError('Não é possível alterar o status do pedido se ele não possuir itens');
             }
 
-            Decimal totalDiscount = calculateTotalDiscount(orderItems);
+            if ((oldOrder.Status == 'New' && order.Status == 'Approved')){
+                order.addError('Não é permitido atualizar o status para Approval, antes de ser aprovado internamente.');
+            }
 
-            if (order.Status == 'In Approval' && totalDiscount < 0.2){
-                
-                System.debug('Total Discount: ' + (totalDiscount * 100) + '%');
-                order.addError('Não é possível alterar o status do pedido para Approved se o desconto total for maior que 20%');
+            if (oldOrder.Status == 'Integrated'){
+                order.addError('Não é possível fazer qualquer alteração em um pedido que está Integrado');
             }
-            else{
-                order.Status = 'Approved';
+
+            if ((oldOrder.Status == 'New' && order.Status == 'Integration Error') ||
+                (oldOrder.Status == 'New' && order.Status == 'Integrated')){
+
+                order.addError('Só é permitido o usuário atualizar o status do pedido de New para In Approval, o restante do processo de aprovação é interno.');
             }
-        }
+
+            if (oldOrder.Status == 'Approved' && order.Status == 'New'){
+                order.addError('Não é permitido atualizar o status de um pedido de Approved para New');
+            }
+        } 
     }
 
-    private Decimal calculateTotalDiscount(List<OrderItem> orderItems){
-        Decimal totalDiscount = 0;
-        Decimal totalFinalPrice = 0;
-        Decimal totalUnitPrice = 0;
+    private void validateIntegration(List<Order> newOrders, Map<Id, Order> oldOrders){
 
-        for (OrderItem item : orderItems){
-            
-            totalFinalPrice += (item.Final_Price__c * item.Quantity);
-            totalUnitPrice += (item.UnitPrice * item.Quantity);
+        List<String> orderIdList = new List<String>();
+        for (Order order : newOrders){
+            if (order.Status == 'Approved') orderIdList.add(order.Id);
         }
 
-        totalDiscount = (totalFinalPrice - totalUnitPrice) / totalFinalPrice;
-
-        return totalDiscount;
+        if (!orderIdList.isEmpty()) {
+            OrderService.getOrderResponseError(orderIdList);
+        }
     }
 }

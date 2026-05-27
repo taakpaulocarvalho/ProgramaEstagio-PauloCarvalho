@@ -8,6 +8,7 @@ public with sharing class CalloutOrder {
 		IntegrationSettings integrationSetting;
 		HttpResponse response;
 		String payload;
+
 		try {
 			integrationSetting = handlerAccessToken(accessTokenLog);
 
@@ -36,6 +37,7 @@ public with sharing class CalloutOrder {
 			for (Order order : sendOrderList) externalIdList.add(order.ExternalId__c);
 			
 			String order = sendOrderList.isEmpty() ? null : sendOrderList[0].ExternalId__c;
+			System.debug('order relacionado: ' + order);
 
 			String errorMessage = handlerError(calloutResponse);
 			String integrationLogId = IntegrationLog.createLog(
