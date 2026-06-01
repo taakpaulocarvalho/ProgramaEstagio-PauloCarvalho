@@ -205,4 +205,13 @@ public with sharing class TemplateDefaultFields {
 			};
 		}
 	}
+
+    public class IntegrationLogDefaults implements FieldDefaults {
+
+        public Map<String, Object> getFieldDefaults(Decimal countSObjectCreated){
+            return new Map<String, Object>{
+                'Name' => 'IntegrationLog' + countSObjectCreated
+            };
+        }
+    }
 }

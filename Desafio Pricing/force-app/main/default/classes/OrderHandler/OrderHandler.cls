@@ -72,9 +72,9 @@ public with sharing class OrderHandler extends TriggerHandler {
                 order.addError('Não é possível fazer qualquer alteração em um pedido que está Ativo');
             }
 
-            if (items.isEmpty() && order.Status != 'New'){
-                order.addError('Não é possível alterar o status do pedido se ele não possuir itens');
-            }
+            // if (items.isEmpty() && order.Status != 'New'){
+            //     order.addError('Não é possível alterar o status do pedido se ele não possuir itens');
+            // }
 
             if ((oldOrder.Status == 'New' && order.Status == 'Approved')){
                 order.addError('Não é permitido atualizar o status para Approval, antes de ser aprovado internamente.');
