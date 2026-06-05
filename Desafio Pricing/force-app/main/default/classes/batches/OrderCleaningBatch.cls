@@ -1,4 +1,4 @@
-public class OrderCleaning implements Database.Batchable<sObject>, Schedulable {
+public class OrderCleaningBatch implements Database.Batchable<sObject>, Schedulable {
 
 
     public Database.QueryLocator start (Database.BatchableContext bc){

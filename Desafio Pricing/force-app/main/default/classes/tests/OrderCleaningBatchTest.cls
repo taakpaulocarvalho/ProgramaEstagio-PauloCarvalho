@@ -1,5 +1,5 @@
 @isTest
-public class OrderCleaningTest {
+public class OrderCleaningBatchTest {
     
     @testSetup
     static void makeData(){

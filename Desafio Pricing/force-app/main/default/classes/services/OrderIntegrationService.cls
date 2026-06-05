@@ -1,4 +1,4 @@
-public with sharing class OrderService {
+public with sharing class OrderIntegrationService {
    
     @future(callout=true)
     public static void getOrderResponseError(List<String> orderIdList){
