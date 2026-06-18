@@ -1,6 +1,5 @@
 public class OrderCleaningBatch implements Database.Batchable<sObject>, Schedulable {
 
-
     public Database.QueryLocator start (Database.BatchableContext bc){
 
         Integer numberOfMonths = 6;
