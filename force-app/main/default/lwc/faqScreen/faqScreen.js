@@ -5,25 +5,21 @@ export default class FAQScreen extends LightningElement {
     searchKey = '';
     delayTimeout;
 
-    // 1. Estados da página
     actualPage = 1;
     pageSize = 10;
     completedData = [];
 
-    // 2. O @wire agora guarda os dados de forma pura e estática
     @wire(getFAQs, { searchKey: '$searchKey' })
     wiredResult({ error, data }) {
         if (data) {
             this.completedData = data;
-            this.actualPage = 1; // Só reseta se o utilizador fizer uma nova pesquisa no input
+            this.actualPage = 1;
         } else if (error) {
             console.error('Erro ao buscar FAQs: ', error);
             this.completedData = [];
         }
     }
 
-    // 3. O SEGREDO DA REATIVIDADE LIMPA: Transformamos a paginação num GETTER.
-    // O HTML vai chamar este getter automaticamente sempre que a página mudar.
     get paginatedData() {
         if (!this.completedData || this.completedData.length === 0) {
             return [];
@@ -37,7 +33,6 @@ export default class FAQScreen extends LightningElement {
         return this.completedData.slice(startIndex, endIndex);
     }
 
-    // 4. Métodos dos botões (agora apenas alteram o número da página)
     handlePrevious() {
         console.log('Previous Button Clicked!');
         if (this.actualPage > 1) {
@@ -52,7 +47,6 @@ export default class FAQScreen extends LightningElement {
         }
     }
 
-    // 5. Getters de controlo calculados dinamicamente
     get totalOfPages() {
         return Math.ceil(this.completedData.length / this.pageSize) || 1;
     }
@@ -75,6 +69,6 @@ export default class FAQScreen extends LightningElement {
 
         this.delayTimeout = setTimeout(() => {
             this.searchKey = typedText; 
-        }, 1000); // 1 segundo conforme especificação de performance
+        }, 1000);
     }
 }

@@ -1,0 +1,56 @@
+ <template>
+   
+    <div class="slds-grid slds-grid_align-center slds-var-p-around_medium">
+
+        <div class="slds-size_1-of-1 slds-medium-size_2-of-3 slds-large-size_1-of-2">
+
+            <lightning-card title = 'FAQ' icon-name="custom:custom18" size="small">
+        
+               <h1 class="slds-text-heading_large slds-align_absolute-center"><strong>Perguntas</strong></h1>
+        
+                <div class="slds-var-m-around_medium">
+                    <lightning-input type="search" placeholder="Escreva sua dúvida" onchange={handleSearchChange}></lightning-input>
+                </div>
+        
+                <template if:false={isEmptyList}>
+                    <lightning-accordion allow-multiple-sections-open>
+        
+                        <template for:each={paginatedData} for:item="faq">
+                            <lightning-accordion-section key={faq.Id} name={faq.Id} label={faq.Question__c}>
+                                <div class="slds-var-p-around_medium">
+                                    <lightning-formatted-rich-text value={faq.Answer__c}></lightning-formatted-rich-text>
+                                </div>
+                            </lightning-accordion-section>
+                            
+                        </template>
+                        
+                        <div class="slds-align-middle slds-var-m-around_medium">
+                             
+                            <div class="slds-grid slds-grid_align-spread slds-var-m-top_medium">    
+                                
+                                <lightning-button label=" Previous" onclick={handlePrevious} disabled={disablePrevious}></lightning-button>
+                                
+                                    <span class="slds-align-middle slds-var-m-around_medium slds-align_absolute-center">
+                                        Página <strong>{actualPage}</strong> de {totalOfPages} 
+                                    </span>
+                                
+                                <lightning-button label=" Next" onclick={handleNext} disabled={disableNext}></lightning-button>
+                            </div>
+                        </div>
+        
+                    </lightning-accordion>
+                
+                </template>
+
+                <template if:true={isEmptyList}>
+                    <div class="slds-grid slds-grid_align-center slds-var-p-around_medium">
+
+                        <p>Nenhum resultado encontrado</p>
+                    </div>
+                </template>
+
+            </lightning-card>
+        </div>
+
+    </div>    
+</template>
